@@ -78,6 +78,8 @@ screenshots/
 *.db
 *.log
 *.pdf
+*.html
+output_test/
 
 # Local planning & blueprint documents (keep local only)
 reference.md

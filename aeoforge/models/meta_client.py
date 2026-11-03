@@ -30,15 +30,40 @@ class MetaAIClient:
         self.ollama_endpoint = ollama_endpoint or settings.ollama_endpoint
         self.ollama_model = ollama_model or settings.ollama_model_name
 
+    async def _resolve_ollama_model(self) -> tuple[Optional[str], bool]:
+        """Resolve available Ollama model and whether it supports vision."""
+        # shortcut: fast 1.5s discovery of local models; fallback to settings name if offline
+        try:
+            async with httpx.AsyncClient(timeout=1.5) as client:
+                res = await client.get(f"{self.ollama_endpoint}/api/tags")
+                if res.status_code != 200:
+                    return None, False
+                models = res.json().get("models", [])
+                if not models:
+                    return None, False
+
+                # Exact or prefix match with configured model
+                for m in models:
+                    name = m.get("name", "")
+                    if name == self.ollama_model or name.startswith(self.ollama_model.split(":")[0]):
+                        caps = m.get("capabilities", [])
+                        has_vision = "vision" in caps or "vision" in name.lower()
+                        return name, has_vision
+
+                # Fallback to any installed Llama model
+                llama_models = [m for m in models if "llama" in m.get("name", "").lower()]
+                target = llama_models[0] if llama_models else models[0]
+                name = target.get("name", "")
+                caps = target.get("capabilities", [])
+                has_vision = "vision" in caps or "vision" in name.lower()
+                return name, has_vision
+        except Exception:
+            return None, False
+
     async def _check_ollama_available(self) -> bool:
         """Check if local Ollama server is running."""
-        # shortcut: 1s ping to Ollama tags endpoint; upgrade to persistent connection pool if doing high-frequency streaming
-        try:
-            async with httpx.AsyncClient(timeout=1.0) as client:
-                res = await client.get(f"{self.ollama_endpoint}/api/tags")
-                return res.status_code == 200
-        except Exception:
-            return False
+        model, _ = await self._resolve_ollama_model()
+        return model is not None
 
     async def analyze_visual_navigation(
         self,
@@ -88,32 +113,39 @@ class MetaAIClient:
             except Exception as e:
                 logger.warning(f"Meta Model API call failed: {e}")
 
-        # Path 2: 100% Local Ollama (Meta Llama 3.2 Vision on-device)
-        if settings.use_ollama and screenshot_base64 and await self._check_ollama_available():
-            try:
-                async with httpx.AsyncClient(timeout=45.0) as client:
-                    resp = await client.post(
-                        f"{self.ollama_endpoint}/api/chat",
-                        json={
-                            "model": self.ollama_model,
-                            "messages": [
-                                {"role": "system", "content": META_VISION_AUDIT_SYSTEM_PROMPT},
-                                {
-                                    "role": "user",
-                                    "content": f"Evaluate this webpage screenshot with Set-of-Mark tags.\nAccessibility Tree:\n{a11y_tree[:2000]}",
-                                    "images": [screenshot_base64]
-                                }
-                            ],
-                            "format": "json",
-                            "stream": False
-                        }
-                    )
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        content = data.get("message", {}).get("content", "{}")
-                        return json.loads(content)
-            except Exception as e:
-                logger.warning(f"Local Ollama vision call failed: {e}")
+        # Path 2: 100% Local Ollama (Meta Llama 3.2 on-device)
+        if settings.use_ollama:
+            resolved_model, has_vision = await self._resolve_ollama_model()
+            if resolved_model:
+                try:
+                    user_msg: Dict[str, Any] = {
+                        "role": "user",
+                        "content": f"Evaluate this webpage screenshot and accessibility tree with Set-of-Mark tags:\nAccessibility Tree:\n{a11y_tree[:2500]}"
+                    }
+                    if has_vision and screenshot_base64:
+                        user_msg["images"] = [screenshot_base64]
+
+                    async with httpx.AsyncClient(timeout=45.0) as client:
+                        resp = await client.post(
+                            f"{self.ollama_endpoint}/api/chat",
+                            json={
+                                "model": resolved_model,
+                                "messages": [
+                                    {"role": "system", "content": META_VISION_AUDIT_SYSTEM_PROMPT},
+                                    user_msg
+                                ],
+                                "format": "json",
+                                "stream": False
+                            }
+                        )
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            content = data.get("message", {}).get("content", "{}")
+                            parsed = json.loads(content)
+                            if "visual_navigability_score" in parsed:
+                                return parsed
+                except Exception as e:
+                    logger.warning(f"Local Ollama vision/nav call failed: {e}")
 
         # Path 3: Local deterministic heuristic fallback
         score = 85
@@ -164,26 +196,31 @@ class MetaAIClient:
                 pass
 
         # Local Ollama
-        if settings.use_ollama and await self._check_ollama_available():
-            try:
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    resp = await client.post(
-                        f"{self.ollama_endpoint}/api/chat",
-                        json={
-                            "model": self.ollama_model,
-                            "messages": [
-                                {"role": "system", "content": META_CITABILITY_SYSTEM_PROMPT},
-                                {"role": "user", "content": f"Analyze this text:\n\n{text_sample[:3000]}"}
-                            ],
-                            "format": "json",
-                            "stream": False
-                        }
-                    )
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        return json.loads(data.get("message", {}).get("content", "{}"))
-            except Exception:
-                pass
+        if settings.use_ollama:
+            resolved_model, _ = await self._resolve_ollama_model()
+            if resolved_model:
+                try:
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        resp = await client.post(
+                            f"{self.ollama_endpoint}/api/chat",
+                            json={
+                                "model": resolved_model,
+                                "messages": [
+                                    {"role": "system", "content": META_CITABILITY_SYSTEM_PROMPT},
+                                    {"role": "user", "content": f"Analyze this text:\n\n{text_sample[:3000]}"}
+                                ],
+                                "format": "json",
+                                "stream": False
+                            }
+                        )
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            content = data.get("message", {}).get("content", "{}")
+                            parsed = json.loads(content)
+                            if "citability_score" in parsed:
+                                return parsed
+                except Exception:
+                    pass
 
         # Heuristic calculation
         import re
