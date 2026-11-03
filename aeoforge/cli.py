@@ -343,11 +343,19 @@ async def run_spec_command(url: str, out_dir: str = "./output"):
     console.print(f"  • {schema_file} (Schema.org JSON-LD Entity Graph)\n")
 
 
-def run_serve_command(host: str, port: int):
-    """Launch FastAPI application server."""
+def run_serve_command(host: str, port: int, open_browser: bool = False):
+    """Launch FastAPI application server with optional browser launch."""
     import uvicorn
+    import webbrowser
+    import threading
+    import time
     print_banner()
-    console.print(f"[green]Starting AEOForge API Server on http://{host}:{port}...[/green]")
+    console.print(f"[bold cyan]🚀 Starting AEOForge Web UI & REST API on http://{host}:{port}...[/bold cyan]")
+    if open_browser:
+        def _open():
+            time.sleep(1.0)
+            webbrowser.open(f"http://{host}:{port}")
+        threading.Thread(target=_open, daemon=True).start()
     uvicorn.run("aeoforge.main:app", host=host, port=port, reload=False)
 
 
@@ -374,9 +382,10 @@ def main():
     patch_parser.add_argument("--url", default="https://example.com", help="Domain URL")
 
     # serve subcommand
-    serve_parser = subparsers.add_parser("serve", help="Run AEOForge REST API server")
+    serve_parser = subparsers.add_parser("serve", help="Run AEOForge REST API server and Web UI")
     serve_parser.add_argument("--host", default=settings.aeoforge_host, help="Bind host")
     serve_parser.add_argument("--port", type=int, default=settings.aeoforge_port, help="Bind port")
+    serve_parser.add_argument("--open", action="store_true", help="Automatically open Web UI in default browser")
 
     args = parser.parse_args()
 
@@ -401,7 +410,7 @@ def main():
         for r in res:
             console.print(f"  • {r.get('artifact', 'file')}: [bold green]{r.get('action')}[/bold green] -> {r.get('file')}")
     elif args.command == "serve":
-        run_serve_command(args.host, args.port)
+        run_serve_command(args.host, args.port, open_browser=args.open)
     else:
         parser.print_help()
 

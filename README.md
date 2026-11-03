@@ -13,7 +13,7 @@
 
 ## ⚡ Value Proposition
 
-The web was built for **human retinas**. Today, the web is browsed by **Answer Engines** (Meta AI, Perplexity, ChatGPT Search) and **Autonomous Web Agents** (Claude Computer Use, browser-use). 
+The web was built for **human retinas**. Today, the web is browsed by **Answer Engines** (Meta AI, Perplexity, ChatGPT Search) and **Autonomous Web Agents** (Claude Computer Use, browser-use).
 
 When AI visits your website:
 - **95% of pages fail**: Massive DOM bloat (50,000+ tokens) wastes LLM context windows.
@@ -26,27 +26,86 @@ When AI visits your website:
 
 ## 🚀 Download & Quickstart
 
-Clone and run the entire platform with a **single command** (handles Python virtualenv, dependencies, Playwright browser, and Ollama check automatically):
+Clone and launch the entire platform with a **single command** (handles Python virtualenv, dependencies, Playwright browser, and Ollama check automatically):
 
 ```bash
 # 1. Clone the repo
 git clone https://github.com/Aryanban/aeoforge.git
 cd aeoforge
 
-# 2. Automated setup & launch Web UI on http://localhost:8000
+# 2. Automated setup & launch Web UI (automatically opens your browser!)
 ./setup.sh --start
 ```
 
-Open **`http://localhost:8000`** in your browser. Done.
+Your browser will automatically open to **`http://localhost:8000`**.
 
-### Other One-Liner Commands
 ```bash
-# Run an instant audit from your terminal
-./setup.sh --audit https://dholeramap.com
-
-# Run the automated test suite (25 tests)
-./setup.sh --test
+# Direct terminal commands to open the Web UI at any time:
+open http://localhost:8000         # macOS
+xdg-open http://localhost:8000     # Linux
+start http://localhost:8000        # Windows
+# or via CLI flag:
+.venv/bin/python -m aeoforge.cli serve --open
 ```
+
+---
+
+## 🎯 3 Ways to Use AEOForge
+
+### 1. In Your Browser (Localhost Web UI)
+Launch via `./setup.sh --start` and navigate to `http://localhost:8000`:
+- **Live 4-Pillar Scorecard**: Enter any URL to get an instant 0–100 AEO score, grade, and prioritized action plan.
+- **Set-of-Mark Visual Grounding**: View your site through the eyes of an AI agent with numbered visual bounding boxes on interactive elements.
+- **Competitor Lab**: Compare two domains side-by-side to uncover why competitors rank higher in AI Overviews.
+- **One-Click Codebase Patching**: Click *"Apply Fix to Codebase"* in the UI to automatically inject `llms.txt` and Schema.org JSON-LD into your project.
+- **Persistent Progression Drawer (`⌘H`)**: Review historical audit progressions and verify net score gains (`+18 pts`).
+
+### 2. From Your Terminal (CLI)
+Run audits, crawls, and codebase patches directly from your command line:
+```bash
+# Audit a single page with rich terminal scorecard
+.venv/bin/python -m aeoforge.cli audit https://dholeramap.com
+
+# Multi-page BFS crawl with sitewide score
+.venv/bin/python -m aeoforge.cli audit https://dholeramap.com --crawl --max-pages 5
+
+# Export machine-executable agent-spec.json and compliant llms.txt
+.venv/bin/python -m aeoforge.cli spec https://dholeramap.com --out-dir ./output
+
+# Automatically patch local HTML/Next.js repo with missing llms.txt and JSON-LD
+.venv/bin/python -m aeoforge.cli patch ./my-website-repo --url https://dholeramap.com
+```
+
+### 3. By Autonomous AI Agents (Claude Code, Antigravity, Cursor, Codex)
+Empower your autonomous AI coding assistants (**Claude Code**, **Antigravity**, **Cursor**, **OpenAI Codex**) to audit, diagnose, and self-heal your website's AEO without manual human intervention.
+
+#### The Autonomous Self-Healing Agent Loop:
+1. **Audit**: Agent calls `aeoforge_audit(url)` to identify missing `llms.txt`, unlabelled buttons, or missing JSON-LD schemas.
+2. **Spec Generation**: Agent calls `aeoforge_generate_spec(url)` to produce exact machine-executable fixes.
+3. **AST Self-Healing Patch**: Agent invokes `aeoforge patch <dir>` or directly applies the generated Schema.org JSON-LD and `llms.txt` to the codebase.
+4. **Autonomous Verification**: Agent re-runs `aeoforge_audit(url)` to verify the score jump (`+20 pts`) before committing!
+
+#### Configure External Agents via MCP (Model Context Protocol):
+Add AEOForge to your Claude Desktop, Cursor, or Antigravity configuration (`claude_desktop_config.json`, `.cursor/mcp.json`, or `~/.gemini/antigravity/mcp_config.json`):
+```json
+{
+  "mcpServers": {
+    "aeoforge": {
+      "command": "/absolute/path/to/aeoforge/.venv/bin/python",
+      "args": ["-m", "aeoforge.mcp_server"],
+      "cwd": "/absolute/path/to/aeoforge"
+    }
+  }
+}
+```
+
+#### Programmatic Agent Manifest:
+Agents can dynamically query all endpoints and schemas at runtime:
+```bash
+curl -s http://127.0.0.1:8000/api/v1/tools | jq .
+```
+
+> **Detailed Agent Manual**: See **[`AGENTS.md`](AGENTS.md)** for architecture, internal APIs, and autonomous tool-calling loops.
 
 ---
 
@@ -83,34 +142,6 @@ Zero cloud subscriptions. Zero mandatory API keys. Runs entirely on your local m
 
 ---
 
-## 🛠️ Key Capabilities
-
-* **Visual Grounding (Set-of-Mark)**: Tags interactive buttons and inputs with numeric visual badges on high-res screenshots for VLM reasoning.
-* **Competitor Lab**: Side-by-side URL comparison showing why competitors outrank you in answer engines.
-* **In-UI AST Codebase Patcher**: Click *"Apply Fix to Codebase"* to automatically write `llms.txt` and inject JSON-LD into your local HTML/React/Next.js repo.
-* **Persistent History & Progression Drawer (`⌘H`)**: Tracks domain score evolution over time (`+18 pts` net delta).
-* **Native MCP Server**: Directly plug AEOForge tools into Claude Desktop, Cursor, Antigravity, or Cline.
-
----
-
-## 🖥️ CLI Reference
-
-```bash
-# 1. Audit a URL with rich terminal scorecard
-.venv/bin/python -m aeoforge.cli audit https://dholeramap.com
-
-# 2. Multi-page internal link crawl with sitewide score
-.venv/bin/python -m aeoforge.cli audit https://dholeramap.com --crawl --max-pages 5
-
-# 3. Generate machine-executable agent-spec.json and llms.txt
-.venv/bin/python -m aeoforge.cli spec https://dholeramap.com --out-dir ./specs
-
-# 4. Patch a local web repository
-.venv/bin/python -m aeoforge.cli patch --target-dir ./my-web-project
-```
-
----
-
 ## 🔍 Real-World Audit: `dholeramap.com`
 
 ```
@@ -120,32 +151,6 @@ Key Strengths:     Valid /llms.txt detected • Zero modal traps • 100% access
 Critical Blockers: robots.txt disallows web crawlers • Zero Schema.org graphs • Heavy DOM bloat (4.2% text)
 Quick Fixes:       Allow Meta-ExternalAgent in robots.txt • Inject Organization JSON-LD • Add author byline
 ```
-
----
-
-## 🔌 Universal Agent Compatibility (MCP & API)
-
-### Model Context Protocol (MCP)
-Add AEOForge to your Claude Desktop or Cursor configuration:
-```json
-{
-  "mcpServers": {
-    "aeoforge": {
-      "command": "/absolute/path/to/aeoforge/.venv/bin/python",
-      "args": ["-m", "aeoforge.mcp_server"],
-      "cwd": "/absolute/path/to/aeoforge"
-    }
-  }
-}
-```
-
-### Programmatic REST API
-Agents can discover all available tools and schemas dynamically:
-```bash
-curl -s http://127.0.0.1:8000/api/v1/tools | jq .
-```
-
-> **For AI Coding Agents**: See **[`AGENTS.md`](AGENTS.md)** for architecture, internal APIs, CLI flags, and implementation guidelines.
 
 ---
 

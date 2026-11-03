@@ -145,9 +145,12 @@ echo -e "${GREEN}${BOLD}========================================================
 # ------------------------------------------------------------------------------
 ACTION="${1:-}"
 
-if [ "$ACTION" == "--start" ] || [ "$ACTION" == "start" ] || [ "$ACTION" == "serve" ]; then
+if [ "$ACTION" == "--start" ] || [ "$ACTION" == "start" ] || [ "$ACTION" == "serve" ] || [ "$ACTION" == "--open" ]; then
     PORT="${2:-8000}"
     echo -e "\n${CYAN}${BOLD}🚀 Launching AEOForge REST API & Interactive UI on http://127.0.0.1:${PORT}...${NC}"
+    # Automatically open default browser in background
+    (sleep 1.2 && (open "http://127.0.0.1:${PORT}" 2>/dev/null || xdg-open "http://127.0.0.1:${PORT}" 2>/dev/null || true)) &
+    echo -e "Opening ${CYAN}http://127.0.0.1:${PORT}${NC} in your browser..."
     echo -e "Press ${BOLD}Ctrl+C${NC} to stop the server.\n"
     exec "$VENV_PYTHON" -m uvicorn aeoforge.main:app --host 127.0.0.1 --port "$PORT" --reload
 elif [ "$ACTION" == "--audit" ] || [ "$ACTION" == "audit" ]; then
