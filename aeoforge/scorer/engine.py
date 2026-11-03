@@ -11,6 +11,8 @@ from aeoforge.models.meta_client import MetaAIClient
 from aeoforge.spec.spec_generator import generate_agent_spec
 from aeoforge.spec.llmstxt_gen import generate_llms_txt, generate_llms_full_txt
 from aeoforge.spec.schema_gen import generate_schema_jsonld
+from aeoforge.scorer.recommendations import RecommendationItem, generate_recommendations
+from aeoforge.scorer.waf_rules import generate_waf_rules
 
 
 class AEOAuditResult(BaseModel):
@@ -31,6 +33,9 @@ class AEOAuditResult(BaseModel):
     llms_txt: Optional[str] = None
     llms_full_txt: Optional[str] = None
     schema_jsonld: Optional[Dict[str, Any]] = None
+    recommendations: Optional[List[RecommendationItem]] = None
+    potential_score: Optional[float] = None
+    waf_rules: Optional[Dict[str, str]] = None
 
 
 def calculate_grade(score: float) -> tuple[str, str]:
@@ -137,6 +142,24 @@ class AEOScoringEngine:
             html=html
         )
 
+        # 5-6 Cloudflare-grade Prioritized Recommendations
+        recs, potential_score = generate_recommendations(
+            url=url,
+            overall_score=total_score,
+            pillars={
+                "pillar_a_citability": p_a,
+                "pillar_b_navigability": p_b,
+                "pillar_c_protocols": p_c,
+                "pillar_d_structured_data": p_d
+            },
+            traps=traps,
+            interactive_marks=interactive_marks
+        )
+
+        from urllib.parse import urlparse
+        domain = urlparse(url).netloc or "example.com"
+        waf_rules = generate_waf_rules(domain)
+
         return AEOAuditResult(
             url=url,
             overall_score=total_score,
@@ -158,5 +181,8 @@ class AEOScoringEngine:
             agent_spec=spec,
             llms_txt=llms_txt,
             llms_full_txt=llms_full_txt,
-            schema_jsonld=schema
+            schema_jsonld=schema,
+            recommendations=recs,
+            potential_score=potential_score,
+            waf_rules=waf_rules
         )

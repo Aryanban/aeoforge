@@ -237,6 +237,16 @@ function renderAuditResults(result) {
     marksScroll.innerHTML = `<p class="text-zinc-600 text-xs py-3 text-center">No interactive marks grounded.</p>`;
   }
 
+  // Render Recommendations & WAF rules
+  renderRecommendations(result.recommendations || [], result.potential_score || result.overall_score);
+  renderWafRules(result.waf_rules || {});
+
+  // Pre-fill target in competitor drawer
+  try {
+    const compInput = document.getElementById("compareTargetInput");
+    if (compInput) compInput.value = new URL(result.url).hostname;
+  } catch (e) {}
+
   if (window.lucide) {
     lucide.createIcons();
   }
@@ -245,7 +255,7 @@ function renderAuditResults(result) {
 // Handshake Subtabs Switching
 function switchHandshakeTab(subtab) {
   activeHandshakeTab = subtab;
-  const tabs = ["agent_spec", "llms_txt", "schema_jsonld", "blockers"];
+  const tabs = ["recommendations", "agent_spec", "llms_txt", "schema_jsonld", "waf_rules", "blockers"];
   
   tabs.forEach(t => {
     const btn = document.getElementById(`hTab-${t}`);
@@ -258,16 +268,187 @@ function switchHandshakeTab(subtab) {
     }
   });
 
+  const recView = document.getElementById("recommendationsView");
   const codeView = document.getElementById("handshakeCodeView");
+  const wafView = document.getElementById("wafRulesView");
   const blockersView = document.getElementById("blockersView");
 
-  if (subtab === "blockers") {
-    codeView.classList.add("hidden");
-    blockersView.classList.remove("hidden");
+  recView?.classList.add("hidden");
+  codeView?.classList.add("hidden");
+  wafView?.classList.add("hidden");
+  blockersView?.classList.add("hidden");
+
+  if (subtab === "recommendations") {
+    recView?.classList.remove("hidden");
+  } else if (subtab === "blockers") {
+    blockersView?.classList.remove("hidden");
+  } else if (subtab === "waf_rules") {
+    wafView?.classList.remove("hidden");
   } else {
-    codeView.classList.remove("hidden");
-    blockersView.classList.add("hidden");
+    codeView?.classList.remove("hidden");
     renderHandshakeCode();
+  }
+}
+
+// Render Recommendations & Score Simulator
+function renderRecommendations(recs, potentialScore) {
+  const currentSim = document.getElementById("currentSimScore");
+  const potentialSim = document.getElementById("potentialSimScore");
+  const gradeBadge = document.getElementById("potentialGradeBadge");
+  const listEl = document.getElementById("recommendationsList");
+
+  if (!listEl) return;
+
+  const baseScore = currentAuditResult ? currentAuditResult.overall_score : 0;
+  if (currentSim) currentSim.textContent = `${baseScore} / 100`;
+  if (potentialSim) potentialSim.textContent = `${potentialScore} / 100`;
+
+  let pGrade = potentialScore >= 90 ? "Grade A+" : (potentialScore >= 80 ? "Grade A" : (potentialScore >= 70 ? "Grade B" : "Grade C"));
+  if (gradeBadge) gradeBadge.textContent = pGrade;
+
+  listEl.innerHTML = "";
+  if (!recs || recs.length === 0) {
+    listEl.innerHTML = `<p class="text-zinc-600 text-xs py-4 text-center">No recommendations required. Clean agent configuration.</p>`;
+    return;
+  }
+
+  recs.forEach((r, idx) => {
+    const card = document.createElement("div");
+    card.className = "p-3 bg-[#060608] border border-white/5 hover:border-white/10 rounded-xl space-y-2 transition-all";
+    card.innerHTML = `
+      <div class="flex items-start justify-between gap-2">
+        <label class="flex items-start space-x-2.5 cursor-pointer flex-1">
+          <input type="checkbox" checked data-boost="${r.score_boost}" onchange="recalculateSimScore()" class="rec-toggle rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 w-3.5 h-3.5 mt-0.5">
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="font-semibold text-white text-xs">${escapeHtml(r.title)}</span>
+              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">+${r.score_boost} pts</span>
+            </div>
+            <p class="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">${escapeHtml(r.description)}</p>
+          </div>
+        </label>
+        ${r.code_snippet ? `
+          <button onclick="copySnippet(${idx})" class="text-[10px] font-mono px-2 py-1 bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-zinc-300 rounded transition-all whitespace-nowrap">
+            Copy Snippet
+          </button>
+        ` : ''}
+      </div>
+    `;
+    listEl.appendChild(card);
+  });
+}
+
+function recalculateSimScore() {
+  const baseScore = currentAuditResult ? currentAuditResult.overall_score : 0;
+  let total = baseScore;
+  const checkboxes = document.querySelectorAll(".rec-toggle");
+  checkboxes.forEach(cb => {
+    if (cb.checked) {
+      total += parseFloat(cb.getAttribute("data-boost") || 0);
+    }
+  });
+  total = Math.min(100, Math.round(total * 10) / 10);
+  const potEl = document.getElementById("potentialSimScore");
+  if (potEl) potEl.textContent = `${total} / 100`;
+  const gradeBadge = document.getElementById("potentialGradeBadge");
+  let pGrade = total >= 90 ? "Grade A+" : (total >= 80 ? "Grade A" : (total >= 70 ? "Grade B" : (total >= 60 ? "Grade C" : "Grade F")));
+  if (gradeBadge) gradeBadge.textContent = pGrade;
+}
+
+function copySnippet(idx) {
+  if (currentAuditResult && currentAuditResult.recommendations && currentAuditResult.recommendations[idx]) {
+    const snip = currentAuditResult.recommendations[idx].code_snippet;
+    if (snip) {
+      navigator.clipboard.writeText(snip);
+      showToast("Copied recommendation snippet");
+    }
+  }
+}
+
+// Render WAF Rules
+function renderWafRules(rules) {
+  const codeEl = document.getElementById("wafCodeView");
+  if (!codeEl) return;
+  if (!rules || !rules.cloudflare) {
+    codeEl.innerHTML = `<code>// Cloudflare WAF allow rule expression will appear here after audit.</code>`;
+    return;
+  }
+  codeEl.textContent = `${rules.cloudflare}\n\n${rules.nginx}\n\n${rules.vercel}`;
+}
+
+function copyWafConfig() {
+  if (currentAuditResult && currentAuditResult.waf_rules) {
+    navigator.clipboard.writeText(currentAuditResult.waf_rules.cloudflare || "");
+    showToast("Copied Cloudflare WAF rule");
+  }
+}
+
+// Head-to-Head Competitor Comparison Handler
+async function handleCompareSubmit(event) {
+  event.preventDefault();
+  let target = document.getElementById("compareTargetInput").value.trim();
+  let comp = document.getElementById("compareCompetitorInput").value.trim();
+
+  if (!target || !comp) return;
+  if (!target.startsWith("http://") && !target.startsWith("https://")) target = "https://" + target;
+  if (!comp.startsWith("http://") && !comp.startsWith("https://")) comp = "https://" + comp;
+
+  const loading = document.getElementById("compareLoading");
+  const resultsDiv = document.getElementById("compareResults");
+  const btn = document.getElementById("compareSubmitBtn");
+
+  btn.disabled = true;
+  loading.classList.remove("hidden");
+  resultsDiv.classList.add("hidden");
+
+  try {
+    const res = await fetch("/api/v1/compare", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target_url: target, competitor_url: comp })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Comparison failed");
+    }
+
+    const data = await res.json();
+    document.getElementById("compareTargetScore").textContent = `${data.target_score} (${data.target_grade})`;
+    document.getElementById("compareTargetUrl").textContent = data.target_url;
+    document.getElementById("compareCompetitorScore").textContent = `${data.competitor_score} (${data.competitor_grade})`;
+    document.getElementById("compareCompetitorUrl").textContent = data.competitor_url;
+
+    const tbody = document.getElementById("compareMetricsTbody");
+    tbody.innerHTML = "";
+    (data.metrics || []).forEach(m => {
+      const tr = document.createElement("tr");
+      const deltaColor = m.winner === "target" ? "text-emerald-400" : (m.winner === "competitor" ? "text-rose-400" : "text-zinc-400");
+      tr.innerHTML = `
+        <td class="p-2.5 font-sans font-medium text-white">${escapeHtml(m.metric_name)}</td>
+        <td class="p-2.5 text-zinc-300">${escapeHtml(m.target_value)}</td>
+        <td class="p-2.5 text-zinc-300">${escapeHtml(m.competitor_value)}</td>
+        <td class="p-2.5 font-bold ${deltaColor}">${escapeHtml(m.delta)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    const blueprintUl = document.getElementById("compareBlueprintUl");
+    blueprintUl.innerHTML = "";
+    (data.outranking_blueprint || []).forEach(b => {
+      const li = document.createElement("li");
+      li.textContent = b;
+      blueprintUl.appendChild(li);
+    });
+
+    resultsDiv.classList.remove("hidden");
+    if (window.lucide) lucide.createIcons();
+    showToast("Competitor comparison completed");
+  } catch (e) {
+    alert("Comparison error: " + e.message);
+  } finally {
+    loading.classList.add("hidden");
+    btn.disabled = false;
   }
 }
 

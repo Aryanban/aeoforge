@@ -19,6 +19,7 @@ from aeoforge.spec.schema_gen import generate_schema_jsonld
 from aeoforge.utils.deobfuscator import extract_obfuscated_emails, deobfuscate_cloudflare_email
 from aeoforge.patcher.ast_patcher import CodebasePatcher
 from aeoforge.models.meta_client import MetaAIClient
+from aeoforge.scorer.competitor import compare_competitors, CompetitorComparisonResult
 
 app = FastAPI(
     title="AEOForge API",
@@ -39,6 +40,11 @@ app.add_middleware(
 class AuditRequest(BaseModel):
     url: str
     capture_screenshot: bool = True
+
+
+class CompareRequest(BaseModel):
+    target_url: str
+    competitor_url: str
 
 
 class CrawlRequest(BaseModel):
@@ -113,6 +119,20 @@ async def audit_endpoint(request: AuditRequest):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Audit failed: {str(e)}")
+
+
+@app.post("/api/v1/compare", response_model=CompetitorComparisonResult)
+async def compare_endpoint(request: CompareRequest):
+    """Run dual headless audit and generate head-to-head AEO outranking blueprint."""
+    try:
+        result = await compare_competitors(
+            target_url=request.target_url,
+            competitor_url=request.competitor_url,
+            headless=settings.playwright_headless
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Competitor comparison failed: {str(e)}")
 
 
 @app.post("/api/v1/crawl")

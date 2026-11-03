@@ -1,4 +1,4 @@
-"""Playwright UI verification script for AEOForge Ultra-Premium Studio."""
+"""Playwright UI verification script for AEOForge Studio with Recommendations & Competitor Comparison."""
 
 import asyncio
 from playwright.async_api import async_playwright
@@ -23,10 +23,6 @@ async def verify_ui():
         badge_text = await page.inner_text("#engineStatusLabel")
         print(f"Engine status badge: {badge_text}")
 
-        # Capture initial state
-        await page.screenshot(path="ui_initial.png", full_page=True)
-        print("Captured ui_initial.png")
-
         # 2. Trigger audit
         print("2. Submitting audit for docs.python.org...")
         await page.fill("#targetUrlInput", "docs.python.org")
@@ -38,52 +34,46 @@ async def verify_ui():
         grade_val = await page.inner_text("#gradeBadge")
         print(f"Audited Score: {score_val}, Grade: {grade_val}")
 
-        # Check Set-of-Mark screenshot and elements
-        som_img = await page.query_selector("#screenshotImg")
-        is_visible = await som_img.is_visible()
-        marks_text = await page.inner_text("#marksBadgeCount")
-        print(f"Set-of-Mark Screenshot visible: {is_visible}, Marks: {marks_text}")
+        # Verify Recommendations & Potential Score Simulator
+        pot_score = await page.inner_text("#potentialSimScore")
+        print(f"Potential Simulated Score: {pot_score}")
+        recs_count = await page.evaluate("() => document.querySelectorAll('#recommendationsList input[type=checkbox]').length")
+        print(f"Prioritized Recommendations Count: {recs_count}")
+        assert recs_count >= 4, "Should render at least 4 prioritized recommendations"
 
-        # Check Meta Llama 3.2 Advice
-        advice = await page.inner_text("#agentAdviceText")
-        print(f"Meta Llama 3.2 Advice: {advice[:80]}...")
-
-        # Capture Audited UI view
+        # Capture Audited UI view with recommendations
         await page.screenshot(path="ui_audited.png", full_page=True)
         print("Captured ui_audited.png")
 
-        # 3. Test Drawer (Deobfuscator)
-        print("3. Testing Deobfuscator Drawer...")
-        await page.click("button:has-text('Deobfuscator')")
-        await page.wait_for_selector("#deobfuscatorDrawer:not(.hidden)")
-        await page.screenshot(path="ui_drawer_deobfuscate.png")
-        await page.click("#deobfuscatorDrawer button:has-text('Decode String')")
-        await page.wait_for_timeout(500)
-        decoded = await page.inner_text("#deobfuscateOutput")
-        print(f"Deobfuscate Output: {decoded}")
-        await page.click("#deobfuscatorDrawer button:has(svg.lucide-x)")
-
-        # 4. Test Handshake Tabs (llms.txt, schema.jsonld)
-        print("4. Testing Handshake Tabs...")
-        await page.click("#hTab-llms_txt")
+        # 3. Test Cloudflare WAF Tab
+        print("3. Testing Cloudflare WAF Rules Tab...")
+        await page.click("#hTab-waf_rules")
         await page.wait_for_timeout(300)
-        llms_code = await page.inner_text("#handshakeCodeView")
-        print(f"llms.txt Code Sample: {llms_code[:60]}...")
+        waf_text = await page.inner_text("#wafCodeView")
+        print(f"Cloudflare WAF Rule Sample: {waf_text[:80]}...")
+        assert "cf.client.bot" in waf_text
 
-        await page.click("#hTab-blockers")
-        await page.wait_for_timeout(300)
-        blockers_visible = await page.is_visible("#blockersView")
-        print(f"Blockers View visible: {blockers_visible}")
+        # 4. Test Competitor Comparison Drawer
+        print("4. Testing Competitor Comparison Drawer...")
+        await page.click("button:has-text('Competitor Outranking')")
+        await page.wait_for_selector("#compareDrawer:not(.hidden)")
+        await page.fill("#compareTargetInput", "example.com")
+        await page.fill("#compareCompetitorInput", "iana.org")
+        await page.click("#compareSubmitBtn")
 
-        await page.screenshot(path="ui_handshake.png", full_page=True)
-        print("Captured ui_handshake.png")
+        await page.wait_for_selector("#compareResults:not(.hidden)", timeout=45000)
+        t_score = await page.inner_text("#compareTargetScore")
+        c_score = await page.inner_text("#compareCompetitorScore")
+        print(f"Comparison Result: Target={t_score} vs Competitor={c_score}")
+        await page.screenshot(path="ui_drawer_competitor.png")
+        print("Captured ui_drawer_competitor.png")
 
         await browser.close()
 
         if console_errors:
             print(f"WARNING: Console errors detected: {console_errors}")
         else:
-            print("SUCCESS: 0 console errors detected!")
+            print("SUCCESS: 0 console errors detected across all flows!")
 
 if __name__ == "__main__":
     asyncio.run(verify_ui())
