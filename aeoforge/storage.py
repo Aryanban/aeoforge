@@ -13,6 +13,15 @@ from urllib.parse import urlparse
 
 def get_default_db_path() -> str:
     """Return persistent SQLite database path with fallback to workspace."""
+    env_path = os.environ.get("AEOFORGE_DB_PATH")
+    if env_path:
+        os.makedirs(os.path.dirname(os.path.abspath(env_path)), exist_ok=True)
+        return env_path
+
+    # Check local workspace data directory first
+    if os.path.isdir("data"):
+        return os.path.abspath("data/aeoforge.db")
+
     base_dir = os.path.expanduser("~/.aeoforge")
     try:
         os.makedirs(base_dir, exist_ok=True)
