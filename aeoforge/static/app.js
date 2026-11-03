@@ -1,15 +1,16 @@
 /**
- * AEOForge Ultra-Premium Engineering Studio Controller
+ * AEOForge • Ultra-Premium Engineering Studio Controller
+ * Modern Interactive State, Cross-Highlighting, Live Score Simulator & Bundle Export
  */
 
 let currentAuditResult = null;
 let currentSpecResult = null;
-let activeHandshakeTab = "agent_spec";
+let activeHandshakeTab = "recommendations";
 let showVisualBadges = true;
 
 function escapeHtml(str) {
   if (!str) return "";
-  return str
+  return String(str)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -23,14 +24,39 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   checkSystemStatus();
 
-  // Keyboard shortcut: ⌘K or / to focus search
+  // Global Keyboard Shortcuts
   document.addEventListener("keydown", (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+    // ⌘K or / to focus search
+    if (((e.metaKey || e.ctrlKey) && e.key === "k") || (e.key === "/" && document.activeElement?.tagName !== "INPUT")) {
       e.preventDefault();
       document.getElementById("targetUrlInput")?.focus();
-    } else if (e.key === "/" && document.activeElement?.tagName !== "INPUT") {
+      document.getElementById("targetUrlInput")?.select();
+    }
+    // ⌘1: Competitor Lab
+    else if ((e.metaKey || e.ctrlKey) && e.key === "1") {
       e.preventDefault();
-      document.getElementById("targetUrlInput")?.focus();
+      toggleDrawer("compareDrawer");
+    }
+    // ⌘2: Crawler
+    else if ((e.metaKey || e.ctrlKey) && e.key === "2") {
+      e.preventDefault();
+      toggleDrawer("crawlerDrawer");
+    }
+    // ⌘3: Deobfuscator
+    else if ((e.metaKey || e.ctrlKey) && e.key === "3") {
+      e.preventDefault();
+      toggleDrawer("deobfuscatorDrawer");
+    }
+    // ⌘4: MCP Tools
+    else if ((e.metaKey || e.ctrlKey) && e.key === "4") {
+      e.preventDefault();
+      toggleDrawer("mcpDrawer");
+    }
+    // Escape: Close all open drawers
+    else if (e.key === "Escape") {
+      ["compareDrawer", "crawlerDrawer", "deobfuscatorDrawer", "mcpDrawer"].forEach(id => {
+        document.getElementById(id)?.classList.add("hidden");
+      });
     }
   });
 });
@@ -47,11 +73,11 @@ async function checkSystemStatus() {
       } else if (data.meta_api_configured) {
         badgeLabel.textContent = `meta-cloud · llama-3.2-vision`;
       } else {
-        badgeLabel.textContent = `offline-deterministic`;
+        badgeLabel.textContent = `local-engine · deterministic`;
       }
     }
   } catch (e) {
-    badgeLabel.textContent = `server-offline`;
+    if (badgeLabel) badgeLabel.textContent = `engine-standby`;
   }
 }
 
@@ -65,18 +91,18 @@ function toggleDrawer(drawerId) {
   }
 }
 
-// Quick Preset Loader
+// Quick Preset Benchmark Loader
 function loadPreset(domain) {
   const input = document.getElementById("targetUrlInput");
   if (input) {
     input.value = domain;
-    document.getElementById("auditSubmitBtn")?.click();
+    document.getElementById("auditForm")?.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
   }
 }
 
 // Audit Form Submission
 async function handleAuditSubmit(event) {
-  event.preventDefault();
+  if (event) event.preventDefault();
   let url = document.getElementById("targetUrlInput").value.trim();
   const captureScreenshot = document.getElementById("screenshotToggle").checked;
 
@@ -105,9 +131,9 @@ async function handleAuditSubmit(event) {
 
     const data = await res.json();
     currentAuditResult = data;
-    currentSpecResult = data; // In-memory specs synthesized with zero redundant roundtrips!
+    currentSpecResult = data; // In-memory specs synthesized at 0ms latency
     renderAuditResults(data);
-    renderHandshakeCode();
+    showToast("Audit completed successfully");
   } catch (error) {
     alert("Audit Error: " + error.message);
   } finally {
@@ -118,119 +144,153 @@ async function handleAuditSubmit(event) {
 
 // Render Results View
 function renderAuditResults(result) {
-  // Master Score & Telemetry
-  const score = result.overall_score;
-  document.getElementById("scoreDisplay").textContent = score;
-  document.getElementById("targetUrlPill").textContent = result.url;
-  document.getElementById("targetUrlPill").title = result.url;
-  
-  const gradeBadge = document.getElementById("gradeBadge");
-  gradeBadge.textContent = `Grade ${result.grade}`;
-  document.getElementById("statusHeadline").textContent = result.status;
+  // Score & Grade
+  const scoreEl = document.getElementById("scoreDisplay");
+  const gradeEl = document.getElementById("gradeBadge");
+  const urlPill = document.getElementById("targetUrlPill");
+  const headlineEl = document.getElementById("statusHeadline");
 
-  // Grade color scheme
-  if (score >= 80) {
-    gradeBadge.className = "px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono";
-  } else if (score >= 60) {
-    gradeBadge.className = "px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono";
+  scoreEl.textContent = result.overall_score;
+  gradeEl.textContent = result.grade;
+  urlPill.textContent = result.url;
+  urlPill.title = result.url;
+
+  // Grade color accent
+  if (result.overall_score >= 80) {
+    gradeEl.className = "px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono";
+  } else if (result.overall_score >= 60) {
+    gradeEl.className = "px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-amber-500/15 border border-amber-500/30 text-amber-400 font-mono";
   } else {
-    gradeBadge.className = "px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-rose-500/10 text-rose-400 border border-rose-500/20 font-mono";
+    gradeEl.className = "px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-rose-500/15 border border-rose-500/30 text-rose-400 font-mono";
   }
 
-  // 4 Foundation Tracks Telemetry
+  if (result.tactical_advice) {
+    headlineEl.textContent = result.tactical_advice.slice(0, 80) + "...";
+  }
+
+  // Pillar Scores & Telemetry
   const pA = result.pillars.pillar_a_citability;
   const pB = result.pillars.pillar_b_navigability;
   const pC = result.pillars.pillar_c_protocols;
   const pD = result.pillars.pillar_d_structured_data;
 
-  // Telemetry Bars
+  // Pillar A: Citability
   document.getElementById("scorePillarA").textContent = `${pA.score} / 25`;
-  document.getElementById("barPillarA").style.width = `${Math.min(100, (pA.score / 25) * 100)}%`;
-  document.getElementById("factDensityVal").textContent = `${pA.details.fact_density_pct}%`;
-  document.getElementById("capsuleVal").textContent = pA.details.has_answer_capsule ? "Capsule: Yes" : "Capsule: None";
+  document.getElementById("barPillarA").style.width = `${(pA.score / 25) * 100}%`;
+  document.getElementById("factDensityVal").textContent = `${pA.details.fact_density_pct || 0}%`;
+  document.getElementById("capsuleVal").textContent = pA.details.has_direct_answer_capsule ? "Verified" : "Missing";
 
+  // Pillar B: Navigability
   document.getElementById("scorePillarB").textContent = `${pB.score} / 25`;
-  document.getElementById("barPillarB").style.width = `${Math.min(100, (pB.score / 25) * 100)}%`;
-  document.getElementById("tokenRatioVal").textContent = `${pB.details.token_ratio_pct}%`;
-  document.getElementById("trapsCountVal").textContent = pB.details.traps_detected_count;
+  document.getElementById("barPillarB").style.width = `${(pB.score / 25) * 100}%`;
+  document.getElementById("tokenRatioVal").textContent = `${pB.details.token_efficiency_ratio || 0}%`;
+  document.getElementById("trapsCountVal").textContent = pB.details.blocker_traps_count || 0;
 
+  // Pillar C: Protocols
   document.getElementById("scorePillarC").textContent = `${pC.score} / 25`;
-  document.getElementById("barPillarC").style.width = `${Math.min(100, (pC.score / 25) * 100)}%`;
-  document.getElementById("llmsTxtVal").textContent = pC.details.has_llms_txt ? "Found" : "None";
-  document.getElementById("robotsVal").textContent = pC.details.ai_bots_allowed ? "Allowed" : "Restricted";
+  document.getElementById("barPillarC").style.width = `${(pC.score / 25) * 100}%`;
+  document.getElementById("llmsTxtVal").textContent = pC.details.llms_txt_status ? "Present" : "Missing";
+  document.getElementById("robotsVal").textContent = pC.details.agent_allowed ? "Allowed" : "Blocked";
 
+  // Pillar D: Structured Data
   document.getElementById("scorePillarD").textContent = `${pD.score} / 25`;
-  document.getElementById("barPillarD").style.width = `${Math.min(100, (pD.score / 25) * 100)}%`;
-  const schemas = pD.details.schema_types || [];
-  document.getElementById("schemaCountVal").textContent = schemas.length;
-  document.getElementById("webmcpVal").textContent = pD.details.discovered_endpoints && pD.details.discovered_endpoints.length > 0 ? "WebMCP" : "None";
+  document.getElementById("barPillarD").style.width = `${(pD.score / 25) * 100}%`;
+  document.getElementById("schemaCountVal").textContent = pD.details.schemas_found || 0;
+  document.getElementById("webmcpVal").textContent = pD.details.webmcp_tools_exposed ? "Exposed" : "None";
 
-  // Strengths List
-  const strengthsUl = document.getElementById("strengthsUl");
-  strengthsUl.innerHTML = "";
-  if (result.key_strengths && result.key_strengths.length > 0) {
-    result.key_strengths.forEach(s => {
-      const li = document.createElement("li");
-      li.innerHTML = escapeHtml(s);
-      strengthsUl.appendChild(li);
-    });
-  } else {
-    strengthsUl.innerHTML = `<li>No significant agent strengths detected.</li>`;
+  // Visual Perception Screenshot & Device Frame
+  const emptyImg = document.getElementById("screenshotEmpty");
+  const shotImg = document.getElementById("screenshotImg");
+  const viewportPill = document.getElementById("viewportUrlPill");
+  if (viewportPill) viewportPill.textContent = result.url;
+
+  const b64 = result.screenshot_base64 || result.som_screenshot_b64;
+  if (b64) {
+    emptyImg.classList.add("hidden");
+    shotImg.classList.remove("hidden");
+    shotImg.src = `data:image/png;base64,${b64}`;
   }
 
-  // Blockers List
-  const blockersUl = document.getElementById("blockersUl");
-  blockersUl.innerHTML = "";
-  if (result.critical_blockers && result.critical_blockers.length > 0) {
-    result.critical_blockers.forEach(b => {
-      const li = document.createElement("li");
-      li.innerHTML = escapeHtml(b);
-      blockersUl.appendChild(li);
-    });
-  } else {
-    blockersUl.innerHTML = `<li>Zero navigation blockers or modal traps detected. Clean layout.</li>`;
-  }
-
-  // Set-of-Mark Screenshot
-  const imgEl = document.getElementById("screenshotImg");
-  const emptyEl = document.getElementById("screenshotEmpty");
-  if (result.screenshot_base64) {
-    imgEl.src = "data:image/jpeg;base64," + result.screenshot_base64;
-    imgEl.classList.remove("hidden");
-    emptyEl.classList.add("hidden");
-  } else {
-    imgEl.classList.add("hidden");
-    emptyEl.classList.remove("hidden");
-  }
-
-  // Meta Llama 3.2 Tactical Navigation Plan
+  // Meta Llama 3.2 Advice
   const adviceEl = document.getElementById("agentAdviceText");
-  if (result.visual_analysis && result.visual_analysis.agent_navigation_advice) {
-    adviceEl.textContent = result.visual_analysis.agent_navigation_advice;
+  let adviceText = "";
+  let adviceMeta = "";
+  if (result.visual_analysis && typeof result.visual_analysis === "object") {
+    adviceText = result.visual_analysis.agent_navigation_advice || result.tactical_advice || "Navigate through direct DOM landmark nodes.";
+    if (result.visual_analysis.visual_navigability_score) {
+      adviceMeta = `Navigability Index: ${result.visual_analysis.visual_navigability_score}/100 • Grounding Accuracy: ${result.visual_analysis.element_grounding_accuracy || 90}%`;
+    }
   } else {
-    adviceEl.textContent = "Clean layout. Proceed with semantic selectors.";
+    adviceText = result.visual_analysis || result.tactical_advice || "Navigate through direct DOM landmark nodes.";
+  }
+  adviceEl.innerHTML = `
+    <div class="text-zinc-200">${escapeHtml(adviceText)}</div>
+    ${adviceMeta ? `<div class="mt-2 pt-2 border-t border-white/[0.06] text-[11px] font-mono text-zinc-400 flex items-center space-x-3"><span>${escapeHtml(adviceMeta)}</span></div>` : ''}
+  `;
+
+  // Critical Blockers & Strengths View
+  const blockersUl = document.getElementById("blockersUl");
+  const strengthsUl = document.getElementById("strengthsUl");
+  if (blockersUl) {
+    blockersUl.innerHTML = "";
+    const blockers = result.critical_blockers || [];
+    if (blockers.length === 0) {
+      blockersUl.innerHTML = "<li>No critical blocker traps detected.</li>";
+    } else {
+      blockers.forEach(b => {
+        const li = document.createElement("li");
+        li.textContent = b;
+        blockersUl.appendChild(li);
+      });
+    }
   }
 
-  // Interactive Marks List
+  if (strengthsUl) {
+    strengthsUl.innerHTML = "";
+    const strengths = result.key_strengths || [];
+    if (strengths.length === 0) {
+      strengthsUl.innerHTML = "<li>Awaiting audit...</li>";
+    } else {
+      strengths.forEach(s => {
+        const li = document.createElement("li");
+        li.textContent = s;
+        strengthsUl.appendChild(li);
+      });
+    }
+  }
+
+  // Grounded Elements with Cross-Highlighting
+  const marksBadge = document.getElementById("marksBadgeCount");
   const marksScroll = document.getElementById("interactiveMarksScroll");
-  const marksBadgeCount = document.getElementById("marksBadgeCount");
   const marks = result.interactive_marks || [];
-  marksBadgeCount.textContent = `${marks.length} grounded`;
+
+  marksBadge.textContent = `${marks.length} grounded elements`;
   marksScroll.innerHTML = "";
 
   if (marks.length > 0) {
-    marks.forEach(m => {
+    marks.forEach((m, idx) => {
       const row = document.createElement("div");
-      row.className = "p-2 bg-zinc-900 hover:bg-zinc-800 border border-white/5 rounded-lg flex items-center justify-between text-[11px] transition-all";
-      const markId = m.id !== undefined ? m.id : (m.mark_id !== undefined ? m.mark_id : 1);
-      const label = (m.name || m.text || m.href || "").substring(0, 32);
+      row.className = "flex items-center justify-between p-2 rounded-lg bg-zinc-900/60 hover:bg-zinc-800/80 border border-white/[0.04] hover:border-white/10 transition-all cursor-pointer group";
+      
+      const label = m.name || m.text || m.href || "Interactive landmark";
+      const markId = m.id || m.mark_id || (idx + 1);
+      
       row.innerHTML = `
-        <div class="flex items-center space-x-2 truncate">
-          <span class="som-badge-pill">[${markId}]</span>
-          <span class="text-zinc-300 font-mono truncate">&lt;${m.tag}&gt; "${escapeHtml(label)}"</span>
+        <div class="flex items-center space-x-2.5 truncate flex-1 pr-2">
+          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30 font-bold">[${markId}]</span>
+          <span class="text-zinc-300 font-mono text-xs truncate">&lt;${escapeHtml(m.tag)}&gt; "${escapeHtml(label)}"</span>
         </div>
-        <span class="text-zinc-500 text-[10px] uppercase font-mono">${m.role || m.tag}</span>
+        <span class="text-zinc-500 text-[10px] uppercase font-mono group-hover:text-zinc-300 transition-colors">${escapeHtml(m.role || m.tag)}</span>
       `;
+
+      // Interactive Cross-Highlighting over screenshot canvas on hover
+      row.addEventListener("mouseenter", () => {
+        highlightCoordinatePin(m);
+      });
+      row.addEventListener("mouseleave", () => {
+        hideCoordinatePin();
+      });
+
       marksScroll.appendChild(row);
     });
   } else {
@@ -252,6 +312,36 @@ function renderAuditResults(result) {
   }
 }
 
+// Coordinate Cross-Highlighting Functions
+function highlightCoordinatePin(mark) {
+  const pin = document.getElementById("coordinateHighlightPin");
+  if (!pin) return;
+
+  let x = 50;
+  let y = 50;
+  if (mark.rect) {
+    const rx = mark.rect.x || 0;
+    const ry = mark.rect.y || 0;
+    const rw = mark.rect.width || 0;
+    const rh = mark.rect.height || 0;
+    x = Math.max(3, Math.min(97, ((rx + rw / 2) / 1280) * 100));
+    y = Math.max(3, Math.min(97, ((ry + rh / 2) / 800) * 100));
+  } else if (mark.box && mark.box.length === 4) {
+    const [ymin, xmin, ymax, xmax] = mark.box;
+    x = ((xmin + xmax) / 2) / 10;
+    y = ((ymin + ymax) / 2) / 10;
+  }
+
+  pin.style.left = `${x}%`;
+  pin.style.top = `${y}%`;
+  pin.classList.remove("hidden");
+}
+
+function hideCoordinatePin() {
+  const pin = document.getElementById("coordinateHighlightPin");
+  if (pin) pin.classList.add("hidden");
+}
+
 // Handshake Subtabs Switching
 function switchHandshakeTab(subtab) {
   activeHandshakeTab = subtab;
@@ -261,9 +351,9 @@ function switchHandshakeTab(subtab) {
     const btn = document.getElementById(`hTab-${t}`);
     if (btn) {
       if (t === subtab) {
-        btn.className = "px-2.5 py-1 rounded-md bg-white text-black font-semibold";
+        btn.className = "px-3 py-1.5 rounded-lg segment-tab-active transition-all";
       } else {
-        btn.className = "px-2.5 py-1 rounded-md text-zinc-400 hover:text-white bg-zinc-900 border border-white/5";
+        btn.className = "px-3 py-1.5 rounded-lg segment-tab-inactive transition-all";
       }
     }
   });
@@ -314,28 +404,31 @@ function renderRecommendations(recs, potentialScore) {
 
   recs.forEach((r, idx) => {
     const card = document.createElement("div");
-    card.className = "p-3 bg-[#060608] border border-white/5 hover:border-white/10 rounded-xl space-y-2 transition-all";
+    card.className = "p-3.5 bg-[#08080a] border border-white/[0.06] hover:border-white/10 rounded-xl space-y-2 transition-all";
     card.innerHTML = `
-      <div class="flex items-start justify-between gap-2">
+      <div class="flex items-start justify-between gap-3">
         <label class="flex items-start space-x-2.5 cursor-pointer flex-1">
-          <input type="checkbox" checked data-boost="${r.score_boost}" onchange="recalculateSimScore()" class="rec-toggle rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 w-3.5 h-3.5 mt-0.5">
+          <input type="checkbox" checked data-boost="${r.score_boost}" onchange="recalculateSimScore()" class="rec-toggle rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 w-3.5 h-3.5 mt-0.5 accent-white">
           <div>
             <div class="flex items-center space-x-2">
               <span class="font-semibold text-white text-xs">${escapeHtml(r.title)}</span>
-              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">+${r.score_boost} pts</span>
+              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">+${r.score_boost} pts</span>
             </div>
-            <p class="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">${escapeHtml(r.description)}</p>
+            <p class="text-xs text-zinc-400 mt-1 leading-relaxed">${escapeHtml(r.description)}</p>
           </div>
         </label>
         ${r.code_snippet ? `
-          <button onclick="copySnippet(${idx})" class="text-[10px] font-mono px-2 py-1 bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-zinc-300 rounded transition-all whitespace-nowrap">
-            Copy Snippet
+          <button onclick="copySnippet(${idx})" class="text-xs font-mono px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-zinc-300 hover:text-white rounded-lg transition-all whitespace-nowrap flex items-center space-x-1">
+            <i data-lucide="copy" class="w-3 h-3"></i>
+            <span>Copy</span>
           </button>
         ` : ''}
       </div>
     `;
     listEl.appendChild(card);
   });
+
+  if (window.lucide) lucide.createIcons();
 }
 
 function recalculateSimScore() {
@@ -504,10 +597,58 @@ function downloadActiveHandshakeFile() {
   showToast(`Downloaded ${filename}`);
 }
 
+// Export Complete Production AEO Bundle (.zip)
+async function exportCurrentBundle() {
+  if (!currentAuditResult) {
+    showToast("Run an audit first before exporting package");
+    return;
+  }
+
+  showToast("Compiling production AEO package...");
+  try {
+    const res = await fetch("/api/v1/export-bundle", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: currentAuditResult.url,
+        agent_spec: currentAuditResult.agent_spec,
+        llms_txt: currentAuditResult.llms_txt,
+        llms_full_txt: currentAuditResult.llms_full_txt,
+        schema_jsonld: currentAuditResult.schema_jsonld,
+        waf_rules: currentAuditResult.waf_rules,
+        recommendations: currentAuditResult.recommendations
+      })
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to export bundle archive");
+    }
+
+    const blob = await res.blob();
+    const domain = new URL(currentAuditResult.url).hostname || "site";
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = downloadUrl;
+    a.download = `aeoforge-${domain}-bundle.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(downloadUrl);
+    showToast(`Downloaded aeoforge-${domain}-bundle.zip`);
+  } catch (e) {
+    alert("Export Error: " + e.message);
+  }
+}
+
 // Copy Llama 3.2 Agent Advice
 function copyAgentAdvice() {
   const advice = document.getElementById("agentAdviceText").textContent;
   navigator.clipboard.writeText(advice);
+  const label = document.getElementById("copyAdviceLabel");
+  if (label) {
+    label.textContent = "Copied!";
+    setTimeout(() => { label.textContent = "Copy"; }, 2000);
+  }
   showToast("Copied tactical agent plan");
 }
 
@@ -564,19 +705,14 @@ async function handlePatchSubmit(event) {
 async function handleCrawlSubmit(event) {
   event.preventDefault();
   const url = document.getElementById("crawlUrlInput").value.trim();
-  const maxPages = parseInt(document.getElementById("crawlMaxPages").value, 10);
-  const loading = document.getElementById("crawlLoading");
+  const maxPages = parseInt(document.getElementById("crawlMaxPagesInput").value, 10);
   const resultsDiv = document.getElementById("crawlResults");
-  const tbody = document.getElementById("crawlTableBody");
-  const avgBadge = document.getElementById("sitewideScoreBadge");
   const btn = document.getElementById("crawlSubmitBtn");
 
   if (!url) return;
 
   btn.disabled = true;
-  loading.classList.remove("hidden");
-  resultsDiv.classList.add("hidden");
-  tbody.innerHTML = "";
+  resultsDiv.innerHTML = `<div class="text-center py-10 space-y-2"><div class="inline-flex w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin"></div><p class="text-zinc-400 font-mono text-xs">Traversing links...</p></div>`;
 
   try {
     const res = await fetch("/api/v1/crawl", {
@@ -591,25 +727,38 @@ async function handleCrawlSubmit(event) {
     }
 
     const data = await res.json();
-    avgBadge.textContent = `${data.sitewide_score} / 100 (${data.sitewide_grade})`;
-
+    let rowsHtml = "";
     (data.pages || []).forEach(p => {
-      const tr = document.createElement("tr");
       const gradeColor = p.overall_score >= 80 ? "text-emerald-400" : (p.overall_score >= 60 ? "text-amber-400" : "text-rose-400");
-
-      tr.innerHTML = `
-        <td class="p-2 text-zinc-300 truncate max-w-[200px]" title="${p.url}">${p.url}</td>
-        <td class="p-2 font-bold ${gradeColor}">${p.overall_score}</td>
-        <td class="p-2 ${gradeColor}">${p.grade}</td>
+      rowsHtml += `
+        <tr class="border-b border-white/5">
+          <td class="p-2 text-zinc-300 truncate max-w-[200px]" title="${p.url}">${p.url}</td>
+          <td class="p-2 font-bold ${gradeColor}">${p.overall_score}</td>
+          <td class="p-2 ${gradeColor}">${p.grade}</td>
+        </tr>
       `;
-      tbody.appendChild(tr);
     });
 
-    resultsDiv.classList.remove("hidden");
+    resultsDiv.innerHTML = `
+      <div class="p-3 bg-[#08080a] border border-white/10 rounded-xl mb-3 flex items-center justify-between">
+        <span class="text-zinc-400 text-xs">Sitewide Aggregate Score:</span>
+        <span class="font-bold text-white font-mono text-sm">${data.sitewide_score} / 100 (${data.sitewide_grade})</span>
+      </div>
+      <table class="w-full text-left text-xs font-mono">
+        <thead>
+          <tr class="text-zinc-500 border-b border-white/5">
+            <th class="p-2">URL</th>
+            <th class="p-2">Score</th>
+            <th class="p-2">Grade</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    `;
+    showToast("Crawl finished");
   } catch (e) {
-    alert("Crawl failed: " + e.message);
+    resultsDiv.innerHTML = `<p class="text-rose-400 text-center py-6">Crawl error: ${escapeHtml(e.message)}</p>`;
   } finally {
-    loading.classList.add("hidden");
     btn.disabled = false;
   }
 }
@@ -617,8 +766,9 @@ async function handleCrawlSubmit(event) {
 // Cloudflare XOR Deobfuscate
 async function handleDeobfuscateSubmit(event) {
   event.preventDefault();
-  const hex = document.getElementById("deobfuscateInput").value.trim();
-  const outEl = document.getElementById("deobfuscateOutput");
+  const hex = document.getElementById("deobfuscateHexInput").value.trim();
+  const resDiv = document.getElementById("deobfuscateResult");
+  const outEl = document.getElementById("deobfuscateOutputText");
 
   if (!hex) return;
 
@@ -630,16 +780,18 @@ async function handleDeobfuscateSubmit(event) {
     });
     const data = await res.json();
     if (res.ok) {
-      outEl.innerHTML = `Decoded Email: <strong class="text-white">${data.decoded_email || 'Invalid token'}</strong>`;
+      resDiv.classList.remove("hidden");
+      outEl.textContent = data.decoded_email || "Invalid token";
+      showToast("Decoded email token");
     } else {
-      outEl.innerHTML = `<span class="text-rose-400">Failed to decode</span>`;
+      alert("Failed to decode token");
     }
   } catch (e) {
-    outEl.innerHTML = `<span class="text-rose-400">Error: ${e.message}</span>`;
+    alert("Error: " + e.message);
   }
 }
 
-// Toggle SoM Overlay
+// Toggle SoM Badges
 function toggleVisualBadges() {
   const btn = document.getElementById("toggleBadgesBtn");
   const imgEl = document.getElementById("screenshotImg");
@@ -655,34 +807,14 @@ function toggleVisualBadges() {
   if (window.lucide) lucide.createIcons();
 }
 
-// Scroll to Handshake Section
-function scrollToHandshake() {
-  document.getElementById("handshakeSection")?.scrollIntoView({ behavior: "smooth" });
-}
-
-// Export Full HTML Report
-function exportCurrentReport() {
-  if (!currentAuditResult) {
-    showToast("Please run an audit first");
-    return;
-  }
-  const blob = new Blob([document.documentElement.outerHTML], { type: "text/html" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `aeoforge-${new URL(currentAuditResult.url).hostname}.html`;
-  a.click();
-  showToast("Report exported");
-}
-
-// Toast Notification
+// Toast Notification System
 function showToast(msg) {
-  const toast = document.getElementById("toast");
-  const msgEl = document.getElementById("toastMsg");
+  const toast = document.getElementById("toastNotification");
+  const msgEl = document.getElementById("toastMessage");
+  if (!toast || !msgEl) return;
   msgEl.textContent = msg;
-  toast.classList.remove("translate-y-20", "opacity-0");
-  toast.classList.add("translate-y-0", "opacity-100");
+  toast.classList.add("show");
   setTimeout(() => {
-    toast.classList.add("translate-y-20", "opacity-0");
-    toast.classList.remove("translate-y-0", "opacity-100");
+    toast.classList.remove("show");
   }, 2200);
 }
