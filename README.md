@@ -1,6 +1,6 @@
-# AEOForge ⚡
-> **The Open-Source Lighthouse for AI Agents & Answer Engines.**  
-> Built for the **Meta Global AI Developer Hackathon 2026** • Powered by **Meta Llama 3.2 Vision**
+# AEOForge
+
+The open-source Answer Engine Optimization (AEO) and agent-readiness platform. Built for the Meta Global AI Developer Hackathon 2026, powered by Meta Llama 3.2.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776ab.svg?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
@@ -11,82 +11,93 @@
 
 ---
 
-## ⚡ Value Proposition
+## Overview
 
-The web was built for **human retinas**. Today, the web is browsed by **Answer Engines** (Meta AI, Perplexity, ChatGPT Search) and **Autonomous Web Agents** (Claude Computer Use, browser-use).
+Traditional web pages are engineered for human eyeballs: heavy DOM trees (50,000+ tokens per page), complex SPAs, modal overlays, unlabelled interactive buttons, and missing metadata. 
 
-When AI visits your website:
-- **95% of pages fail**: Massive DOM bloat (50,000+ tokens) wastes LLM context windows.
-- **Agents get trapped**: Unlabelled buttons, cookie popups, and modal overlays stall agents in infinite loops.
-- **Content is hallucinated or ignored**: Sites lack structured fact-triplets, `/llms.txt` manifests, and Schema.org entity graphs.
+As search shifts toward Answer Engines (Meta AI, Perplexity, ChatGPT Search) and Autonomous Browser Agents (Claude Computer Use, browser-use), unoptimized websites suffer from:
+- Excessive token consumption and agent timeout loops.
+- Missing structured fact-triplets and Schema.org entity graphs.
+- Crawler barriers in `robots.txt` and lack of `/llms.txt` navigation manifests.
 
-**AEOForge solves this in seconds.** It crawls your website with local headless vision, scores it across 4 AEO Pillars (0–100), grounds interactive elements with Set-of-Mark tags, and auto-generates machine-executable `agent-spec.json`, `llms.txt`, and Schema.org patches.
+AEOForge audits web pages using local headless browser navigation, evaluates them against a 4-pillar 0–100 scoring system, grounds interactive elements with Set-of-Mark visual coordinate tags, and generates machine-executable `agent-spec.json`, `llms.txt`, and Schema.org JSON-LD patches.
 
 ---
 
-## 🚀 Download & Quickstart
+## Quickstart
 
-Clone and launch the entire platform with a **single command** (handles Python virtualenv, dependencies, Playwright browser, and Ollama check automatically):
+Clone the repository and launch the full stack with a single command. The setup script configures the Python virtual environment, installs dependencies, provisions Playwright Chromium, and verifies the local Ollama instance:
 
 ```bash
-# 1. Clone the repo
 git clone https://github.com/Aryanban/aeoforge.git
 cd aeoforge
-
-# 2. Automated setup & launch Web UI (automatically opens your browser!)
 ./setup.sh --start
 ```
 
-Your browser will automatically open to **`http://localhost:8000`**.
+The Web UI automatically opens at `http://localhost:8000`.
+
+To open the running Web UI directly from the command line:
 
 ```bash
-# Direct terminal commands to open the Web UI at any time:
-open http://localhost:8000         # macOS
-xdg-open http://localhost:8000     # Linux
-start http://localhost:8000        # Windows
-# or via CLI flag:
+# macOS
+open http://localhost:8000
+
+# Linux
+xdg-open http://localhost:8000
+
+# Windows
+start http://localhost:8000
+
+# Or via CLI flag
 .venv/bin/python -m aeoforge.cli serve --open
 ```
 
 ---
 
-## 🎯 3 Ways to Use AEOForge
+## Usage Modes
 
-### 1. In Your Browser (Localhost Web UI)
-Launch via `./setup.sh --start` and navigate to `http://localhost:8000`:
-- **Live 4-Pillar Scorecard**: Enter any URL to get an instant 0–100 AEO score, grade, and prioritized action plan.
-- **Set-of-Mark Visual Grounding**: View your site through the eyes of an AI agent with numbered visual bounding boxes on interactive elements.
-- **Competitor Lab**: Compare two domains side-by-side to uncover why competitors rank higher in AI Overviews.
-- **One-Click Codebase Patching**: Click *"Apply Fix to Codebase"* in the UI to automatically inject `llms.txt` and Schema.org JSON-LD into your project.
-- **Persistent Progression Drawer (`⌘H`)**: Review historical audit progressions and verify net score gains (`+18 pts`).
+AEOForge operates across three primary surfaces:
 
-### 2. From Your Terminal (CLI)
-Run audits, crawls, and codebase patches directly from your command line:
+### 1. Web Dashboard (Browser)
+
+Navigate to `http://localhost:8000` to access the interactive audit studio:
+- **4-Pillar Scorecard**: 0–100 score with grade breakdown (A through F) and prioritized remediation recommendations.
+- **Set-of-Mark (SoM) Grounding**: Interactive screenshot highlighting all agent-accessible inputs, buttons, and links with numbered bounding badges.
+- **Competitor Lab**: Direct side-by-side URL comparison to benchmark AEO readiness against rival domains.
+- **In-UI AST Codebase Patcher**: Click "Apply Fix to Codebase" to automatically write `llms.txt` and inject Schema.org JSON-LD into your project.
+- **Progression Drawer (Cmd+H)**: Historical audit records and domain score evolution curves stored in persistent SQLite.
+
+### 2. Command Line Interface (CLI)
+
+Run audits, crawls, spec generations, and codebase patches directly from the terminal:
+
 ```bash
-# Audit a single page with rich terminal scorecard
+# Audit a single URL with formatted terminal output
 .venv/bin/python -m aeoforge.cli audit https://dholeramap.com
 
-# Multi-page BFS crawl with sitewide score
+# Multi-page BFS crawl with domain average score
 .venv/bin/python -m aeoforge.cli audit https://dholeramap.com --crawl --max-pages 5
 
-# Export machine-executable agent-spec.json and compliant llms.txt
+# Generate agent-spec.json, llms.txt, and schema.jsonld
 .venv/bin/python -m aeoforge.cli spec https://dholeramap.com --out-dir ./output
 
-# Automatically patch local HTML/Next.js repo with missing llms.txt and JSON-LD
-.venv/bin/python -m aeoforge.cli patch ./my-website-repo --url https://dholeramap.com
+# Automatically patch a local HTML/Next.js/React repository
+.venv/bin/python -m aeoforge.cli patch ./my-website-project --url https://dholeramap.com
 ```
 
-### 3. By Autonomous AI Agents (Claude Code, Antigravity, Cursor, Codex)
-Empower your autonomous AI coding assistants (**Claude Code**, **Antigravity**, **Cursor**, **OpenAI Codex**) to audit, diagnose, and self-heal your website's AEO without manual human intervention.
+### 3. Autonomous AI Coding Agents
 
-#### The Autonomous Self-Healing Agent Loop:
-1. **Audit**: Agent calls `aeoforge_audit(url)` to identify missing `llms.txt`, unlabelled buttons, or missing JSON-LD schemas.
-2. **Spec Generation**: Agent calls `aeoforge_generate_spec(url)` to produce exact machine-executable fixes.
-3. **AST Self-Healing Patch**: Agent invokes `aeoforge patch <dir>` or directly applies the generated Schema.org JSON-LD and `llms.txt` to the codebase.
-4. **Autonomous Verification**: Agent re-runs `aeoforge_audit(url)` to verify the score jump (`+20 pts`) before committing!
+AEOForge provides tools for autonomous AI agents (Claude Code, Google Antigravity, Cursor, OpenAI Codex) to audit, diagnose, and patch websites in a closed feedback loop:
 
-#### Configure External Agents via MCP (Model Context Protocol):
-Add AEOForge to your Claude Desktop, Cursor, or Antigravity configuration (`claude_desktop_config.json`, `.cursor/mcp.json`, or `~/.gemini/antigravity/mcp_config.json`):
+1. **Audit**: Agent invokes `aeoforge_audit(url)` to identify blockers, DOM bloat, or missing protocols.
+2. **Spec Generation**: Agent runs `aeoforge_generate_spec(url)` to receive machine-executable navigation specs and JSON-LD markup.
+3. **AST Self-Healing Patch**: Agent executes `aeoforge patch <dir>` or directly applies the generated assets to project templates.
+4. **Autonomous Verification**: Agent re-audits the URL to confirm score improvement prior to committing changes.
+
+#### Model Context Protocol (MCP) Configuration
+
+Configure external agents by adding AEOForge to your MCP configuration (`claude_desktop_config.json`, `.cursor/mcp.json`, or `~/.gemini/antigravity/mcp_config.json`):
+
 ```json
 {
   "mcpServers": {
@@ -99,72 +110,84 @@ Add AEOForge to your Claude Desktop, Cursor, or Antigravity configuration (`clau
 }
 ```
 
-#### Programmatic Agent Manifest:
-Agents can dynamically query all endpoints and schemas at runtime:
+#### Programmatic Tool Manifest
+
+Agents running in HTTP environments can dynamically discover endpoints and argument schemas:
+
 ```bash
 curl -s http://127.0.0.1:8000/api/v1/tools | jq .
 ```
 
-> **Detailed Agent Manual**: See **[`AGENTS.md`](AGENTS.md)** for architecture, internal APIs, and autonomous tool-calling loops.
+For complete agent development rules and internal API contracts, see [AGENTS.md](AGENTS.md).
 
 ---
 
-## 💻 100% Local Sovereignty (Runs on a 16GB Laptop)
+## Local Execution & System Requirements
 
-Zero cloud subscriptions. Zero mandatory API keys. Runs entirely on your local machine:
+AEOForge runs locally without mandatory cloud accounts or external API keys. It is tested on standard developer hardware (including 16 GB Apple Silicon Macs and Linux/Windows systems):
 
 | Component | Local Engine | Resource Footprint |
 | :--- | :--- | :--- |
-| **Reasoning & Citability** | Local Meta Llama 3.2 via [Ollama](https://ollama.com) (`ollama pull llama3.2`) | ~2.0 GB RAM (ultra-fast on M-series Mac / PC) |
-| **Browser Navigator** | Local Playwright Chromium (stealth mode) | ~300 MB RAM |
-| **Persistent Storage** | Local SQLite (`data/aeoforge.db`) with WAL mode | Instant zero-latency queries |
-| **Codebase Patcher** | Local AST injector (adds `llms.txt` & JSON-LD) | Local filesystem |
-| **Fallback** | Built-in deterministic regex & DOM heuristics | Runs immediately if Ollama is off |
+| Reasoning & Citability | Local Meta Llama 3.2 via [Ollama](https://ollama.com) (`ollama pull llama3.2`) | ~2.0 GB RAM |
+| Browser Navigator | Local Playwright Chromium (stealth mode) | ~300 MB RAM |
+| Persistent Storage | Local SQLite (`data/aeoforge.db`) with WAL mode | Instant query execution |
+| Codebase Patcher | AST engine (HTML, Next.js, React) | Local filesystem |
+| Fallback Engine | Deterministic regex and DOM tree analyzer | 0 MB additional RAM |
 
-*(Optional: Cloud keys for Meta Model API, Gemini, Claude, or OpenAI can be added in the UI settings).*
+Optional cloud provider keys (Meta Model API, Anthropic Claude, Google Gemini, OpenAI) can be configured via the UI settings modal or environment variables.
 
 ---
 
-## 📊 The 4 AEO Pillars (0–100 Score)
+## The 4-Pillar Scoring Framework
 
-```
-       0 ────────────── 50 ────────────── 75 ────────────── 100
-      [    F / D    ]     [     C     ]     [     B     ]     [     A     ]
-      Critical Traps    Needs Optimize    Agent-Ready       Benchmark
-```
+Every audited page receives a score from 0 to 100 points:
 
-| Pillar | Max Pts | What We Measure | Why AI Cares |
+| Pillar | Points | Evaluation Scope | Answer Engine Impact |
 | :--- | :---: | :--- | :--- |
-| **Pillar A: Citability** | 25 | Fact-triplet density (`<S, P, O>`), 40–60 word answer capsules, E-E-A-T credentials | Answer engines need concise, verifiable assertions to cite your site in AI Overviews. |
-| **Pillar B: Navigability** | 25 | Text-to-DOM ratio, semantic landmarks (`<main>`, `<nav>`), zero modal/cookie traps | Traps and bloated HTML burn LLM tokens and trigger agent timeouts. |
-| **Pillar C: Machine Protocols** | 25 | Spec-compliant `/llms.txt`, `robots.txt` AI crawler directives | Dictates whether AI crawlers (`Meta-ExternalAgent`, `PerplexityBot`) are allowed to index you. |
-| **Pillar D: Structured Data** | 25 | Schema.org JSON-LD graphs, hidden public JSON API endpoints | Allows agents to query clean structured data without parsing messy HTML. |
+| **Pillar A: Citability** | 25 | Fact-triplet density (`<Subject, Predicate, Object>`), 40–60 word definition blocks, E-E-A-T credentials | Required for direct attribution in Google AI Overviews and Perplexity summaries. |
+| **Pillar B: Navigability** | 25 | Text-to-DOM ratio, semantic landmarks (`<main>`, `<nav>`), absence of modal and cookie traps | Prevents agent context exhaustion and infinite execution loops. |
+| **Pillar C: Machine Protocols** | 25 | Conformance to `/llms.txt`, crawler directives in `robots.txt` | Determines whether AI indexing agents (`Meta-ExternalAgent`, `PerplexityBot`) are permitted to crawl. |
+| **Pillar D: Structured Data** | 25 | Schema.org JSON-LD entity graphs, exposed public JSON API endpoints | Enables agents to extract structured data directly without parsing presentation HTML. |
 
 ---
 
-## 🔍 Real-World Audit: `dholeramap.com`
+## Audit Case Study: dholeramap.com
+
+Results from an autonomous audit run on `https://dholeramap.com/`:
 
 ```
 Target URL:        https://dholeramap.com/
 Overall Score:     66.0 / 100 (Grade C)
-Key Strengths:     Valid /llms.txt detected • Zero modal traps • 100% accessible element names
-Critical Blockers: robots.txt disallows web crawlers • Zero Schema.org graphs • Heavy DOM bloat (4.2% text)
-Quick Fixes:       Allow Meta-ExternalAgent in robots.txt • Inject Organization JSON-LD • Add author byline
+
+Pillar Breakdown:
+  - Pillar A (Citability):      12.0 / 25  (Fact density: 6.5%, has definition capsule, weak E-E-A-T)
+  - Pillar B (Navigability):    17.5 / 25  (DOM ratio: 4.23% text, 0 traps, clean landmarks)
+  - Pillar C (Protocols):       19.0 / 25  (llms.txt present at root, robots.txt disallows crawlers)
+  - Pillar D (Structured Data): 17.5 / 25  (0 Schema.org JSON-LD graphs found)
+
+Remediation Steps:
+  1. Update robots.txt to allow verified AI agent crawlers (Meta-ExternalAgent, ClaudeBot, PerplexityBot).
+  2. Inject Schema.org Place, WebSite, and Organization JSON-LD markup.
+  3. Add explicit author attribution and updated timestamps to improve citation confidence.
 ```
 
 ---
 
-## 🧪 Testing
+## Testing
+
+Run the test suite using pytest:
 
 ```bash
 ./setup.sh --test
-# or
+
+# Or directly via pytest
 .venv/bin/pytest -v
 ```
 
 ---
 
-## 📜 License & Attribution
+## License
 
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.  
-Copyright © 2026 Aryan Bansal. Built with pride for the Meta Global AI Developer Hackathon 2026.
+Distributed under the MIT License. See [LICENSE](LICENSE) for details.
+
+Copyright (c) 2026 Aryan Bansal. Built for the Meta Global AI Developer Hackathon 2026.
