@@ -63,27 +63,59 @@ class BrowserNavigator:
             context = await browser.new_context(
                 viewport={"width": 1280, "height": 800},
                 user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+                locale="en-US",
+                extra_http_headers={
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Sec-Ch-Ua": '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
+                    "Sec-Ch-Ua-Mobile": "?0",
+                    "Sec-Ch-Ua-Platform": '"macOS"',
+                    "Sec-Fetch-Dest": "document",
+                    "Sec-Fetch-Mode": "navigate",
+                    "Sec-Fetch-Site": "none",
+                    "Sec-Fetch-User": "?1",
+                    "Upgrade-Insecure-Requests": "1"
+                }
             )
+
+            # Mask headless artifacts (inspired by playwright-stealth)
+            # shortcut: masks webdriver and languages; upgrade to full WebGL/Canvas fingerprint spoofer if specialized fraud systems target tests
+            await context.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+                window.chrome = { runtime: {} };
+            """)
+
             page = await context.new_page()
 
             # Attach route interception to block bloat
             if settings.playwright_fast_route_filter:
                 await setup_route_interception(page, block_images=False)
 
+            http_status = 200
             try:
                 response = await page.goto(url, wait_until="domcontentloaded", timeout=self.timeout_ms)
+                if response:
+                    http_status = response.status
                 # Wait briefly for client-side hydration
                 await page.wait_for_timeout(1000)
             except Exception as e:
-                # If network timeout or navigation failed, raise or attempt partial read
                 pass
 
             final_url = page.url
             title = await page.title()
             html = await page.content()
 
-            # Detect traps and modal overlays
+            # Detect traps, captchas, and WAF firewalls
             traps = await detect_navigation_traps(page)
+            if http_status in (403, 429, 503):
+                traps.append({
+                    "name": f"HTTP {http_status} WAF / Rate-Limit Block",
+                    "category": "firewall_block",
+                    "severity": "critical",
+                    "active_selector": "http_status",
+                    "dismiss_selector": None,
+                    "recommendation": f"Server returned HTTP {http_status}. Check Cloudflare/Vercel firewall rate-limits."
+                })
 
             # Extract Set-of-Mark interactive elements
             marks = await extract_interactive_marks(page)

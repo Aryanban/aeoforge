@@ -61,6 +61,20 @@ KNOWN_TRAP_SIGNATURES = [
         "dismiss_selectors": [],
         "category": "bot_challenge",
         "severity": "critical"
+    },
+    {
+        "name": "Cloudflare WAF Access Block",
+        "selectors": ["#cf-error-details", ".cf-error-overview", "#challenge-error-text"],
+        "dismiss_selectors": [],
+        "category": "firewall_block",
+        "severity": "critical"
+    },
+    {
+        "name": "Vercel Security Checkpoint",
+        "selectors": ["#vercel-challenge", "[data-vercel-challenge]"],
+        "dismiss_selectors": [],
+        "category": "firewall_block",
+        "severity": "critical"
     }
 ]
 
@@ -69,6 +83,30 @@ async def detect_navigation_traps(page) -> List[Dict[str, Any]]:
     """Scan the rendered DOM for active modal overlays, cookie walls, and agent blockers."""
     # shortcut: signature list covers top 5 CMPs and 3 captchas; upgrade to visual ML model if custom canvas modals appear
     detected_traps: List[Dict[str, Any]] = []
+
+    # 0. Check page title and body text for WAF challenges
+    try:
+        title = await page.title()
+        if "Attention Required! | Cloudflare" in title or "Just a moment..." in title:
+            detected_traps.append({
+                "name": "Cloudflare Bot Management Challenge",
+                "category": "firewall_block",
+                "severity": "critical",
+                "active_selector": "html",
+                "dismiss_selector": None,
+                "recommendation": "Configure Cloudflare WAF: Enable 'Allow Verified AI Bots' under Security -> Bots."
+            })
+        elif "Vercel Security Checkpoint" in title:
+            detected_traps.append({
+                "name": "Vercel Security Checkpoint Block",
+                "category": "firewall_block",
+                "severity": "critical",
+                "active_selector": "html",
+                "dismiss_selector": None,
+                "recommendation": "Configure Vercel Firewall: Whitelist AI crawler user-agents or publish static /llms.txt."
+            })
+    except Exception:
+        pass
 
     # 1. Check known signature selectors
     for sig in KNOWN_TRAP_SIGNATURES:
