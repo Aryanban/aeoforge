@@ -169,6 +169,48 @@ async def verify_ui():
         await page.keyboard.press("Escape")
         await page.wait_for_selector("#modelSettingsModal", state="hidden")
 
+        # 9. Test Persistent History Drawer & Progression Lab
+        print("9. Testing Persistent History Drawer & Progression Lab...")
+        await page.click("#historyDrawerBtn")
+        await page.wait_for_selector("#historyDrawer:not(.hidden)")
+        await page.wait_for_timeout(300)
+
+        history_items = await page.query_selector_all("#historyListContainer > div")
+        print(f"Historical audit records found in SQLite: {len(history_items)}")
+        assert len(history_items) > 0, "Persistent SQLite history must display recorded audits"
+
+        # Check domain progression card
+        prog_visible = await page.is_visible("#historyProgressionCard")
+        print(f"Domain progression card visible: {prog_visible}")
+
+        # Close history drawer
+        await page.keyboard.press("Escape")
+        await page.wait_for_selector("#historyDrawer", state="hidden")
+
+        # 10. Test Technical Setup & In-UI Codebase AST Patcher
+        print("10. Testing Technical Setup & In-UI Codebase AST Patcher...")
+        await page.click("#technicalSetupBtn")
+        await page.wait_for_selector("#modelSettingsModal:not(.hidden)")
+        
+        # Switch to Patcher tab
+        await page.click("#mTab-patcher")
+        await page.wait_for_selector("#mView-patcher:not(.hidden)")
+
+        # Run In-UI Patch
+        await page.click("#runPatchBtn")
+        await page.wait_for_selector("#patchExecutionOutput:has-text('Successful')", timeout=10000)
+        patch_text = await page.inner_text("#patchExecutionOutput")
+        print(f"Codebase Patch Output: {patch_text[:80]}...")
+        assert "Successful" in patch_text
+
+        # Switch to Crawler & Anti-Block tab
+        await page.click("#mTab-crawler")
+        await page.wait_for_selector("#mView-crawler:not(.hidden)")
+        print("✓ Crawler & Anti-Block settings view verified")
+
+        await page.keyboard.press("Escape")
+        await page.wait_for_selector("#modelSettingsModal", state="hidden")
+
         print(f"Console Errors: {console_errors}")
         assert len(console_errors) == 0, f"Found console errors: {console_errors}"
         print("SUCCESS: 0 console errors detected across all flows!")

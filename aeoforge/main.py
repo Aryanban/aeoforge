@@ -24,6 +24,7 @@ from aeoforge.utils.deobfuscator import extract_obfuscated_emails, deobfuscate_c
 from aeoforge.patcher.ast_patcher import CodebasePatcher
 from aeoforge.models.meta_client import MetaAIClient
 from aeoforge.scorer.competitor import compare_competitors, CompetitorComparisonResult
+from aeoforge.storage import storage
 
 app = FastAPI(
     title="AEOForge API",
@@ -185,6 +186,15 @@ async def audit_endpoint(request: AuditRequest):
             screenshot_b64=nav_data.screenshot_base64
         )
         result.title = nav_data.title
+
+        # Persist to SQLite and compute domain progression metrics
+        try:
+            audit_id, prog = storage.save_audit(nav_data.final_url, result.model_dump())
+            result.audit_id = audit_id
+            result.progression = prog
+        except Exception as store_err:
+            print(f"[Warning] Failed to persist audit to SQLite storage: {store_err}")
+
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Audit failed: {str(e)}")
@@ -401,6 +411,12 @@ async def patch_endpoint(request: PatchRequest):
         spec = request.agent_spec or {"$schema": "https://aeoforge.dev/schemas/agent-spec-v1.json", "domain": request.url}
         schema = request.schema_jsonld or {"@context": "https://schema.org", "@type": "WebSite", "url": request.url}
         res = patcher.patch_all(llms, spec, schema)
+
+        try:
+            storage.log_patch(domain=request.url, target_dir=request.target_dir, patched_files=res)
+        except Exception:
+            pass
+
         return {
             "status": "success",
             "target_dir": request.target_dir,
@@ -408,6 +424,75 @@ async def patch_endpoint(request: PatchRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Patch failed: {str(e)}")
+
+
+@app.get("/api/v1/history")
+async def get_history_endpoint(domain: Optional[str] = None, limit: int = 25):
+    """Retrieve list of past audit summaries from persistent SQLite storage."""
+    return storage.list_audits(domain=domain, limit=limit)
+
+
+@app.get("/api/v1/history/{audit_id}")
+async def get_history_detail_endpoint(audit_id: str):
+    """Retrieve full audit snapshot by audit ID."""
+    res = storage.get_audit(audit_id)
+    if not res:
+        raise HTTPException(status_code=404, detail="Audit record not found")
+    return res
+
+
+@app.delete("/api/v1/history/{audit_id}")
+async def delete_history_endpoint(audit_id: str):
+    """Delete single audit from persistent storage."""
+    deleted = storage.delete_audit(audit_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Audit not found")
+    return {"status": "deleted", "audit_id": audit_id}
+
+
+@app.delete("/api/v1/history")
+async def clear_history_endpoint():
+    """Clear all historical audits from persistent storage."""
+    count = storage.clear_history()
+    return {"status": "cleared", "records_removed": count}
+
+
+@app.get("/api/v1/progression/{domain:path}")
+async def get_domain_progression_endpoint(domain: str):
+    """Get progression timeline, score trajectory, and delta metrics for a domain."""
+    parsed = urlparse(domain)
+    clean_domain = parsed.netloc or parsed.path or domain
+    if "://" in clean_domain:
+        clean_domain = clean_domain.split("://")[-1]
+    clean_domain = clean_domain.split("/")[0]
+    return storage.get_domain_progression(clean_domain)
+
+
+class SettingsPayload(BaseModel):
+    settings: Dict[str, Any]
+
+
+@app.get("/api/v1/settings")
+async def get_settings_endpoint():
+    """Get stored persistent user preferences & technical setup."""
+    all_s = storage.get_all_settings()
+    masked = {}
+    for k, v in all_s.items():
+        if "api_key" in k and isinstance(v, str) and len(v) > 8:
+            masked[k] = v[:4] + "••••••••" + v[-4:]
+        else:
+            masked[k] = v
+    return {"settings": masked}
+
+
+@app.post("/api/v1/settings")
+async def save_settings_endpoint(payload: SettingsPayload):
+    """Save persistent user configurations and technical setup in SQLite."""
+    for k, v in payload.settings.items():
+        if isinstance(v, str) and "••••••••" in v:
+            continue
+        storage.set_setting(k, v)
+    return {"status": "saved", "count": len(payload.settings)}
 
 
 @app.post("/api/v1/deobfuscate-email")

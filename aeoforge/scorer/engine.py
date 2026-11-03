@@ -36,6 +36,8 @@ class AEOAuditResult(BaseModel):
     recommendations: Optional[List[RecommendationItem]] = None
     potential_score: Optional[float] = None
     waf_rules: Optional[Dict[str, str]] = None
+    audit_id: Optional[str] = None
+    progression: Optional[Dict[str, Any]] = None
 
 
 def calculate_grade(score: float) -> tuple[str, str]:

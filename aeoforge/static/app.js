@@ -34,6 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
     lucide.createIcons();
   }
   checkSystemStatus();
+  initHistory();
 
   // Global Keyboard Shortcuts
   document.addEventListener("keydown", (e) => {
@@ -42,6 +43,16 @@ document.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       document.getElementById("targetUrlInput")?.focus();
       document.getElementById("targetUrlInput")?.select();
+    }
+    // ⌘H: Persistent History & Progression
+    else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "h") {
+      e.preventDefault();
+      toggleDrawer("historyDrawer");
+    }
+    // ⌘S: Technical Setup Control Center
+    else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      openTechnicalSetupModal();
     }
     // ⌘1: Competitor Lab
     else if ((e.metaKey || e.ctrlKey) && e.key === "1") {
@@ -65,7 +76,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     // Escape: Close all open drawers & modals
     else if (e.key === "Escape") {
-      ["compareDrawer", "crawlerDrawer", "deobfuscatorDrawer", "mcpDrawer", "modelSettingsModal"].forEach(id => {
+      ["compareDrawer", "crawlerDrawer", "deobfuscatorDrawer", "mcpDrawer", "historyDrawer", "modelSettingsModal"].forEach(id => {
         document.getElementById(id)?.classList.add("hidden");
       });
       dismissErrorDialog();
@@ -292,6 +303,38 @@ function renderAuditResults(result) {
     headlineEl.textContent = result.tactical_advice.slice(0, 80) + "...";
   }
 
+  // Update Progression Banner in HUD
+  const progBanner = document.getElementById("progressionBanner");
+  const progDeltaPill = document.getElementById("progressionDeltaPill");
+  const progDeltaText = document.getElementById("progressionDeltaText");
+  const progRunsText = document.getElementById("progressionRunsText");
+
+  if (result.progression && result.progression.audit_count > 0) {
+    if (progBanner) progBanner.classList.remove("hidden");
+    const delta = result.progression.delta_since_previous;
+    const runs = result.progression.audit_count;
+    if (progDeltaText) {
+      progDeltaText.textContent = `${delta >= 0 ? '+' : ''}${delta} pts`;
+    }
+    if (progDeltaPill) {
+      if (delta > 0) {
+        progDeltaPill.className = "text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 flex items-center space-x-1";
+      } else if (delta < 0) {
+        progDeltaPill.className = "text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/25 flex items-center space-x-1";
+      } else {
+        progDeltaPill.className = "text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-white/10 flex items-center space-x-1";
+      }
+    }
+    if (progRunsText) {
+      progRunsText.textContent = `Run #${runs} · ${result.progression.trend}`;
+    }
+  } else if (progBanner) {
+    progBanner.classList.add("hidden");
+  }
+
+  // Refresh history feed in background
+  refreshHistoryFeed(false);
+
   // Pillar Scores & Telemetry
   const pA = result.pillars.pillar_a_citability;
   const pB = result.pillars.pillar_b_navigability;
@@ -504,12 +547,32 @@ function switchHandshakeTab(subtab) {
   }
 }
 
+let activeRecFilter = "all";
+
+function filterRecommendations(cat) {
+  activeRecFilter = cat;
+  const buttons = document.querySelectorAll(".rec-filter-btn");
+  buttons.forEach(btn => {
+    if (btn.getAttribute("data-cat") === cat) {
+      btn.classList.add("segment-tab-active");
+      btn.classList.remove("segment-tab-inactive");
+    } else {
+      btn.classList.remove("segment-tab-active");
+      btn.classList.add("segment-tab-inactive");
+    }
+  });
+  if (currentAuditResult) {
+    renderRecommendations(currentAuditResult.recommendations, currentAuditResult.potential_score);
+  }
+}
+
 // Render Recommendations & Score Simulator
 function renderRecommendations(recs, potentialScore) {
   const currentSim = document.getElementById("currentSimScore");
   const potentialSim = document.getElementById("potentialSimScore");
   const gradeBadge = document.getElementById("potentialGradeBadge");
   const listEl = document.getElementById("recommendationsList");
+  const allCountEl = document.getElementById("recFilterAllCount");
 
   if (!listEl) return;
 
@@ -523,31 +586,67 @@ function renderRecommendations(recs, potentialScore) {
   listEl.innerHTML = "";
   if (!recs || recs.length === 0) {
     listEl.innerHTML = `<p class="text-zinc-600 text-xs py-4 text-center">No recommendations required. Clean agent configuration.</p>`;
+    if (allCountEl) allCountEl.textContent = "0";
     return;
   }
 
-  recs.forEach((r, idx) => {
+  if (allCountEl) allCountEl.textContent = recs.length;
+
+  const filteredRecs = (activeRecFilter === "all")
+    ? recs
+    : recs.filter(r => r.category === activeRecFilter);
+
+  if (filteredRecs.length === 0) {
+    listEl.innerHTML = `<p class="text-zinc-600 text-xs py-4 text-center">No recommendations under '${escapeHtml(activeRecFilter)}'.</p>`;
+    return;
+  }
+
+  filteredRecs.forEach((r, idx) => {
+    const originalIdx = recs.indexOf(r);
     const card = document.createElement("div");
-    card.className = "p-3.5 bg-[#08080a] border border-white/[0.06] hover:border-white/10 rounded-xl space-y-2 transition-all";
+    card.className = "p-3.5 bg-[#08080a] border border-white/[0.06] hover:border-white/10 rounded-xl space-y-2.5 transition-all";
+
+    const impactBadge = r.impact === "critical"
+      ? `<span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold">Critical</span>`
+      : (r.impact === "high"
+        ? `<span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">High Impact</span>`
+        : `<span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold">Quick Win</span>`);
+
     card.innerHTML = `
       <div class="flex items-start justify-between gap-3">
         <label class="flex items-start space-x-2.5 cursor-pointer flex-1">
           <input type="checkbox" checked data-boost="${r.score_boost}" onchange="recalculateSimScore()" class="rec-toggle rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 w-3.5 h-3.5 mt-0.5 accent-white">
           <div>
-            <div class="flex items-center space-x-2">
+            <div class="flex flex-wrap items-center gap-1.5">
               <span class="font-semibold text-white text-xs">${escapeHtml(r.title)}</span>
+              ${impactBadge}
               <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">+${r.score_boost} pts</span>
+              ${r.target_file ? `<span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-300 border border-white/5">${escapeHtml(r.target_file)}</span>` : ''}
             </div>
             <p class="text-xs text-zinc-400 mt-1 leading-relaxed">${escapeHtml(r.description)}</p>
           </div>
         </label>
-        ${r.code_snippet ? `
-          <button onclick="copySnippet(${idx})" class="text-xs font-mono px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-zinc-300 hover:text-white rounded-lg transition-all whitespace-nowrap flex items-center space-x-1">
-            <i data-lucide="copy" class="w-3 h-3"></i>
-            <span>Copy</span>
-          </button>
-        ` : ''}
+        
+        <div class="flex items-center space-x-1.5 whitespace-nowrap">
+          ${r.code_snippet ? `
+            <button type="button" onclick="copySnippet(${originalIdx})" class="text-xs font-mono px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-zinc-300 hover:text-white rounded-lg transition-all flex items-center space-x-1" title="Copy code snippet">
+              <i data-lucide="copy" class="w-3 h-3"></i>
+              <span>Copy</span>
+            </button>
+            <button type="button" onclick="applyRecommendationFix(${originalIdx})" class="text-xs font-mono px-2.5 py-1 bg-white hover:bg-zinc-200 text-black font-semibold rounded-lg transition-all flex items-center space-x-1 shadow-sm" title="Apply this fix directly to repository">
+              <i data-lucide="zap" class="w-3 h-3 text-amber-500"></i>
+              <span>Apply</span>
+            </button>
+          ` : ''}
+        </div>
       </div>
+      
+      ${r.code_snippet ? `
+        <details class="text-[11px] font-mono text-zinc-400 group">
+          <summary class="cursor-pointer text-zinc-500 hover:text-zinc-300 transition-colors select-none">View Code Snippet</summary>
+          <pre class="mt-1.5 p-2.5 bg-black/60 rounded-lg border border-white/5 text-zinc-300 overflow-x-auto whitespace-pre"><code>${escapeHtml(r.code_snippet)}</code></pre>
+        </details>
+      ` : ''}
     `;
     listEl.appendChild(card);
   });
@@ -1008,7 +1107,7 @@ function closeModelSettingsModal() {
 }
 
 function switchModelTab(provider) {
-  const tabs = ["ollama", "cloud", "preferences"];
+  const tabs = ["ollama", "cloud", "patcher", "crawler", "preferences"];
   tabs.forEach(t => {
     const tabEl = document.getElementById(`mTab-${t}`);
     const viewEl = document.getElementById(`mView-${t}`);
@@ -1236,3 +1335,364 @@ window.initTheme = initTheme;
 window.setTheme = setTheme;
 window.applyTheme = applyTheme;
 window.toggleReduceMotion = toggleReduceMotion;
+
+// ==============================================================
+// Persistent History, Domain Progression & In-UI Technical Tools
+// ==============================================================
+
+let cachedHistory = [];
+
+function formatRelativeTime(dateStr) {
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffSec = Math.floor((now - date) / 1000);
+    if (diffSec < 60) return "Just now";
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  } catch {
+    return dateStr;
+  }
+}
+
+async function initHistory() {
+  await refreshHistoryFeed(false);
+}
+
+async function refreshHistoryFeed(showFeedback = true) {
+  try {
+    const res = await fetch("/api/v1/history");
+    if (!res.ok) return;
+    const audits = await res.json();
+    cachedHistory = audits;
+
+    // Update count badge
+    const badge = document.getElementById("historyCountBadge");
+    if (badge) {
+      if (audits.length > 0) {
+        badge.textContent = audits.length;
+        badge.classList.remove("hidden");
+      } else {
+        badge.classList.add("hidden");
+      }
+    }
+
+    renderHistoryFeed(audits);
+
+    if (currentAuditResult) {
+      loadDomainProgression(currentAuditResult.url);
+    }
+    if (showFeedback) {
+      showToast("Refreshed persistent audit history");
+    }
+  } catch (e) {
+    console.warn("Failed to load history:", e);
+  }
+}
+
+function filterHistoryList(query) {
+  if (!cachedHistory) return;
+  const q = (query || "").toLowerCase().trim();
+  const filtered = q
+    ? cachedHistory.filter(a => (a.domain || "").toLowerCase().includes(q) || (a.url || "").toLowerCase().includes(q))
+    : cachedHistory;
+  renderHistoryFeed(filtered);
+}
+
+function renderHistoryFeed(audits) {
+  const container = document.getElementById("historyListContainer");
+  if (!container) return;
+
+  if (!audits || audits.length === 0) {
+    container.innerHTML = `<p class="text-zinc-600 text-center py-12">No audit snapshots stored yet in persistent storage.</p>`;
+    return;
+  }
+
+  container.innerHTML = "";
+  audits.forEach(a => {
+    const card = document.createElement("div");
+    card.className = "p-3 bg-[#08080a] border border-white/[0.06] hover:border-white/10 rounded-xl space-y-2 transition-all";
+
+    const gradeColor = a.overall_score >= 80 ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : (a.overall_score >= 60 ? "text-amber-400 bg-amber-500/10 border-amber-500/20" : "text-rose-400 bg-rose-500/10 border-rose-500/20");
+
+    card.innerHTML = `
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center space-x-2">
+            <span class="font-bold text-white text-xs truncate max-w-[200px]" title="${escapeHtml(a.url)}">${escapeHtml(a.domain)}</span>
+            <span class="text-[10px] font-mono px-1.5 py-0.2 rounded font-bold border ${gradeColor}">${a.overall_score} (${a.grade})</span>
+          </div>
+          <span class="text-[11px] text-zinc-500 font-mono">${formatRelativeTime(a.created_at)}</span>
+        </div>
+        
+        <div class="flex items-center space-x-1">
+          <button type="button" onclick="restoreHistoricalAudit('${a.id}')" class="px-2 py-1 text-[11px] font-mono bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-white/10 rounded-lg transition-all" title="Restore snapshot in workspace">
+            Restore
+          </button>
+          <button type="button" onclick="reAuditHistoricalUrl('${escapeHtml(a.url)}')" class="px-2 py-1 text-[11px] font-mono bg-white hover:bg-zinc-200 text-black font-semibold rounded-lg transition-all shadow-sm" title="Re-run audit">
+            Re-Audit
+          </button>
+          <button type="button" onclick="deleteHistoricalAudit('${a.id}')" class="p-1 text-zinc-500 hover:text-rose-400 rounded transition-all" title="Delete record">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-4 gap-1 text-[10px] font-mono text-zinc-400 pt-1 border-t border-white/5">
+        <div>Vis: <span class="text-zinc-200 font-semibold">${a.visual_score || 0}</span></div>
+        <div>Sem: <span class="text-zinc-200 font-semibold">${a.semantic_score || 0}</span></div>
+        <div>Proto: <span class="text-zinc-200 font-semibold">${a.protocol_score || 0}</span></div>
+        <div>Cit: <span class="text-zinc-200 font-semibold">${a.citability_score || 0}</span></div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  if (window.lucide) lucide.createIcons();
+}
+
+async function loadDomainProgression(url) {
+  try {
+    let domain = "";
+    try {
+      domain = new URL(url).hostname || url;
+    } catch {
+      domain = url.replace(/^https?:\/\//, "").split("/")[0];
+    }
+    const res = await fetch(`/api/v1/progression/${encodeURIComponent(domain)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const card = document.getElementById("historyProgressionCard");
+    if (!card) return;
+
+    if (data.audit_count > 0) {
+      card.classList.remove("hidden");
+      document.getElementById("progDomainLabel").textContent = data.domain;
+      document.getElementById("progInitialScore").textContent = `${data.initial_score} / 100`;
+      document.getElementById("progLatestScore").textContent = `${data.latest_score} / 100`;
+      document.getElementById("progAuditCount").textContent = data.audit_count;
+
+      const netBadge = document.getElementById("progNetDeltaBadge");
+      if (netBadge) {
+        netBadge.textContent = `${data.delta_since_first >= 0 ? '+' : ''}${data.delta_since_first} pts`;
+        netBadge.className = data.delta_since_first > 0
+          ? "text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25"
+          : (data.delta_since_first < 0
+            ? "text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/25"
+            : "text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-white/10");
+      }
+
+      // Render Step Progression Timeline
+      const stepsContainer = document.getElementById("progTimelineSteps");
+      if (stepsContainer) {
+        stepsContainer.innerHTML = "";
+        data.points.forEach((p, idx) => {
+          const stepEl = document.createElement("div");
+          stepEl.className = "flex items-center space-x-1.5 shrink-0";
+          stepEl.innerHTML = `
+            <div class="px-2 py-1 rounded-md bg-zinc-900 border border-white/10 text-[10px] font-mono flex items-center space-x-1">
+              <span class="text-zinc-500">#${idx + 1}</span>
+              <span class="font-bold text-white">${p.score}</span>
+              <span class="text-zinc-400">(${p.grade})</span>
+            </div>
+            ${idx < data.points.length - 1 ? `<span class="text-zinc-600 text-xs">➔</span>` : ''}
+          `;
+          stepsContainer.appendChild(stepEl);
+        });
+      }
+    } else {
+      card.classList.add("hidden");
+    }
+  } catch (e) {
+    console.warn("Progression fetch error:", e);
+  }
+}
+
+async function restoreHistoricalAudit(auditId) {
+  try {
+    showToast("Restoring historical audit snapshot...");
+    const res = await fetch(`/api/v1/history/${auditId}`);
+    if (!res.ok) throw new Error("Could not fetch audit snapshot");
+    const data = await res.json();
+    currentAuditResult = data;
+    currentSpecResult = data;
+    renderAuditResults(data);
+    toggleDrawer("historyDrawer");
+    showToast(`Restored snapshot for ${data.domain || data.url}`);
+  } catch (e) {
+    alert("Restore error: " + e.message);
+  }
+}
+
+function reAuditHistoricalUrl(url) {
+  toggleDrawer("historyDrawer");
+  const input = document.getElementById("targetUrlInput");
+  if (input) input.value = url;
+  handleAuditSubmit();
+}
+
+async function deleteHistoricalAudit(auditId) {
+  try {
+    const res = await fetch(`/api/v1/history/${auditId}`, { method: "DELETE" });
+    if (res.ok) {
+      showToast("Audit deleted from persistent storage");
+      await refreshHistoryFeed(false);
+    }
+  } catch (e) {
+    alert("Delete error: " + e.message);
+  }
+}
+
+async function clearAuditHistory() {
+  if (!confirm("Are you sure you want to clear all audit history from persistent storage?")) {
+    return;
+  }
+  try {
+    const res = await fetch("/api/v1/history", { method: "DELETE" });
+    if (res.ok) {
+      showToast("Cleared all audit history");
+      document.getElementById("progressionBanner")?.classList.add("hidden");
+      document.getElementById("historyProgressionCard")?.classList.add("hidden");
+      await refreshHistoryFeed(false);
+    }
+  } catch (e) {
+    alert("Clear history error: " + e.message);
+  }
+}
+
+function openTechnicalSetupModal(tab = "ollama") {
+  openModelSettingsModal();
+  switchModelTab(tab);
+}
+
+function openSelfHealingPatcherModal() {
+  openTechnicalSetupModal("patcher");
+}
+
+async function applyRecommendationFix(idx) {
+  if (!currentAuditResult || !currentAuditResult.recommendations || !currentAuditResult.recommendations[idx]) {
+    return;
+  }
+  const rec = currentAuditResult.recommendations[idx];
+  showToast(`Injecting fix for ${rec.title}...`);
+
+  try {
+    const res = await fetch("/api/v1/patch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        target_dir: ".",
+        url: currentAuditResult.url,
+        agent_spec: currentAuditResult.agent_spec,
+        llms_txt: currentAuditResult.llms_txt,
+        schema_jsonld: currentAuditResult.schema_jsonld
+      })
+    });
+    const data = await res.json();
+    if (data.status === "success") {
+      showToast(`✓ Injected fix for ${rec.title} into codebase!`);
+    } else {
+      showToast(`Patch failed: ${data.detail || "Error"}`);
+    }
+  } catch (e) {
+    showToast(`Patch error: ${e.message}`);
+  }
+}
+
+async function executeInUiCodebasePatch() {
+  const btn = document.getElementById("runPatchBtn");
+  const outputEl = document.getElementById("patchExecutionOutput");
+  const targetDir = document.getElementById("patchTargetDirInput").value.trim() || ".";
+  const url = currentAuditResult ? currentAuditResult.url : "https://example.com";
+
+  btn.disabled = true;
+  btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Injecting AST Artifacts...</span>`;
+  if (window.lucide) lucide.createIcons();
+
+  const includeLlms = document.getElementById("patchLlmsTxtToggle").checked;
+  const includeSpec = document.getElementById("patchAgentSpecToggle").checked;
+  const includeSchema = document.getElementById("patchSchemaToggle").checked;
+
+  const payload = {
+    target_dir: targetDir,
+    url: url,
+    agent_spec: includeSpec && currentAuditResult ? currentAuditResult.agent_spec : null,
+    llms_txt: includeLlms && currentAuditResult ? currentAuditResult.llms_txt : null,
+    schema_jsonld: includeSchema && currentAuditResult ? currentAuditResult.schema_jsonld : null
+  };
+
+  try {
+    const res = await fetch("/api/v1/patch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.status === "success") {
+      outputEl.classList.remove("hidden");
+      let lines = [`<div class="text-emerald-400 font-bold mb-1">✓ Self-Healing Injection Successful into <code>${escapeHtml(data.target_dir)}</code></div>`];
+      (data.patched_files || []).forEach(f => {
+        const filePath = typeof f === "object" ? (f.file || f.artifact || JSON.stringify(f)) : f;
+        lines.push(`<div class="text-zinc-300">✓ Injected: <span class="text-white">${escapeHtml(filePath)}</span></div>`);
+      });
+      outputEl.innerHTML = lines.join("");
+      showToast(`Injected ${data.patched_files.length} AEO files into codebase`);
+    } else {
+      outputEl.classList.remove("hidden");
+      outputEl.innerHTML = `<div class="text-rose-400">✗ Patch Error: ${escapeHtml(data.detail || "Failed to patch")}</div>`;
+    }
+  } catch (e) {
+    outputEl.classList.remove("hidden");
+    outputEl.innerHTML = `<div class="text-rose-400">✗ Network Error: ${escapeHtml(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<i data-lucide="hammer" class="w-3.5 h-3.5"></i><span>Run Self-Healing AST Injection</span>`;
+    if (window.lucide) lucide.createIcons();
+  }
+}
+
+async function saveCrawlerSettings() {
+  const userAgent = document.getElementById("crawlerUserAgentSelect").value;
+  const timeout = parseInt(document.getElementById("crawlerTimeoutInput").value) || 45;
+  const depth = parseInt(document.getElementById("crawlerDepthInput").value) || 3;
+  const stealth = document.getElementById("stealthModeToggle").checked;
+  const autoSolve = document.getElementById("autoSolveChallengesToggle").checked;
+
+  try {
+    const res = await fetch("/api/v1/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        settings: {
+          crawler_user_agent: userAgent,
+          crawler_timeout_sec: timeout,
+          crawler_max_depth: depth,
+          stealth_mode_enabled: stealth,
+          auto_dismiss_challenges: autoSolve
+        }
+      })
+    });
+    if (res.ok) {
+      showToast("Saved crawler & shield settings to SQLite storage");
+    }
+  } catch (e) {
+    alert("Save settings error: " + e.message);
+  }
+}
+
+// Expose technical helpers on window
+window.initHistory = initHistory;
+window.refreshHistoryFeed = refreshHistoryFeed;
+window.filterHistoryList = filterHistoryList;
+window.restoreHistoricalAudit = restoreHistoricalAudit;
+window.reAuditHistoricalUrl = reAuditHistoricalUrl;
+window.deleteHistoricalAudit = deleteHistoricalAudit;
+window.clearAuditHistory = clearAuditHistory;
+window.openTechnicalSetupModal = openTechnicalSetupModal;
+window.openSelfHealingPatcherModal = openSelfHealingPatcherModal;
+window.filterRecommendations = filterRecommendations;
+window.applyRecommendationFix = applyRecommendationFix;
+window.executeInUiCodebasePatch = executeInUiCodebasePatch;
+window.saveCrawlerSettings = saveCrawlerSettings;
