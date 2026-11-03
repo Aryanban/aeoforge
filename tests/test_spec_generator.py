@@ -35,6 +35,8 @@ def test_generate_agent_spec():
     assert spec["aeo_score"] == 88.5
     assert spec["agent_instructions"]["primary_content_selector"] == "main#main-content"
     assert spec["agent_instructions"]["action_map"]["key_actions"]["pricing_link"] == "/pricing"
+    assert len(spec["agent_instructions"]["webmcp_tools"]) >= 1
+    assert "savings vs raw HTML" in spec["agent_instructions"]["token_budget_hint"]
 
 
 def test_generate_llms_txt():

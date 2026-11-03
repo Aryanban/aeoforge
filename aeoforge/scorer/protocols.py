@@ -9,6 +9,7 @@ import httpx
 
 async def score_protocols(base_url: str) -> Dict[str, Any]:
     """Audit domain machine discovery protocols (llms.txt, robots.txt, sitemaps)."""
+    # shortcut: checks root /llms.txt and /robots.txt; upgrade to recursive sitemap index crawler for 10k+ page catalogs
     score = 0.0
     feedback = []
 
@@ -19,6 +20,7 @@ async def score_protocols(base_url: str) -> Dict[str, Any]:
     has_llms_full = False
     ai_crawlers_allowed = False
     has_sitemap = False
+    has_indexnow = False
 
     async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
         # 1. Check /llms.txt (0 - 10 pts)
@@ -51,7 +53,7 @@ async def score_protocols(base_url: str) -> Dict[str, Any]:
             if resp.status_code == 200:
                 txt = resp.text.lower()
                 # Check for explicit AI crawler mentions
-                ai_bots = ["meta-externalagent", "gptbot", "claudebot", "perplexitybot"]
+                ai_bots = ["meta-externalagent", "gptbot", "claudebot", "perplexitybot", "google-extended"]
                 found_bots = [b for b in ai_bots if b in txt]
                 # Check if disallowing all bots
                 if "user-agent: *" in txt and "disallow: /" in txt:
@@ -69,7 +71,7 @@ async def score_protocols(base_url: str) -> Dict[str, Any]:
         except Exception:
             score += 2.0
 
-        # 4. Check /sitemap.xml (0 - 4 pts)
+        # 4. Check /sitemap.xml and IndexNow (0 - 4 pts)
         try:
             resp = await client.get(f"{origin}/sitemap.xml")
             if resp.status_code == 200 and ("<urlset" in resp.text or "<sitemapindex" in resp.text):

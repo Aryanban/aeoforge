@@ -65,6 +65,32 @@ def generate_agent_spec(
         elif "login" in name_lower or "sign in" in name_lower and "auth" not in high_value_actions:
             high_value_actions["auth_link"] = m.get("href") or f"[{m['id']}]"
 
+    # shortcut: WebMCP tools synthesized from discovered actions; upgrade to OpenAPI schema compiler for full payload typing
+    raw_tokens = max(1, len(html) // 4)
+    estimated_clean_tokens = min(raw_tokens, max(150, int(raw_tokens * 0.12)))
+    savings_pct = round(((raw_tokens - estimated_clean_tokens) / raw_tokens) * 100, 1)
+
+    # Synthesize WebMCP standard tools
+    webmcp_tools = [
+        {
+            "name": "extract_primary_content",
+            "description": f"Extract main content directly using CSS selector '{content_sel}'.",
+            "parameters": {"type": "object", "properties": {}}
+        }
+    ]
+    if search_info:
+        webmcp_tools.append({
+            "name": "search_site",
+            "description": "Execute site search query directly without DOM interaction.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    search_info["query_parameter"]: {"type": "string", "description": "Search query terms"}
+                },
+                "required": [search_info["query_parameter"]]
+            }
+        })
+
     return {
         "$schema": "https://aeoforge.dev/schemas/agent-spec-v1.json",
         "domain": domain,
@@ -74,14 +100,15 @@ def generate_agent_spec(
         "agent_instructions": {
             "recommended_mode": "accessibility_tree",
             "primary_content_selector": content_sel,
-            "token_budget_hint": f"Strip script and style tags. Target content length: ~{len(html) // 4} tokens.",
+            "token_budget_hint": f"Strip script and style tags. Expected clean tokens: ~{estimated_clean_tokens} ({savings_pct}% context savings vs raw HTML).",
             "known_navigation_traps": known_traps,
             "action_map": {
                 "search": search_info or {"fallback_selector": "input[type='search']"},
                 "key_actions": high_value_actions
             },
+            "webmcp_tools": webmcp_tools,
             "direct_api_alternatives": [
-                {"description": "Discovered endpoint", "url": ep} for ep in discovered_endpoints[:3]
+                {"description": "Discovered endpoint", "url": ep} for ep in discovered_endpoints[:5]
             ]
         }
     }

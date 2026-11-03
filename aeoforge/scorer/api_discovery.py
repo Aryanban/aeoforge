@@ -64,8 +64,17 @@ def score_api_and_data(html: str) -> Dict[str, Any]:
         feedback.append("Incomplete OpenGraph tags. Add og:title, og:description, and og:type.")
 
     # 3. Direct Search & API Action Endpoints (0 - 7 pts)
+    # shortcut: scans HTML links and script strings; upgrade to dynamic CDP fetch interception for runtime RPC calls
     api_score = 0.0
     discovered_endpoints: List[str] = []
+    has_webmcp = False
+
+    # Check for WebMCP link rel or window.modelContext indicators
+    webmcp_link = soup.find("link", attrs={"rel": re.compile(r"webmcp|agent-spec", re.I)})
+    if webmcp_link:
+        has_webmcp = True
+        api_score += 4.0
+        discovered_endpoints.append(f"WebMCP Manifest: {webmcp_link.get('href')}")
 
     # Check search forms
     search_forms = soup.find_all("form", attrs={"action": True})
@@ -76,7 +85,7 @@ def score_api_and_data(html: str) -> Dict[str, Any]:
             discovered_endpoints.append(f"Search Action: {action}")
             break
 
-    # Check for direct API links or JSON endpoints
+    # Check for direct API links or JSON endpoints (OpenAPI, Swagger, ai-plugin)
     json_links = soup.find_all("link", attrs={"type": re.compile(r"json", re.I)})
     for l in json_links:
         href = l.get("href")
@@ -84,11 +93,15 @@ def score_api_and_data(html: str) -> Dict[str, Any]:
             api_score += 3.5
             discovered_endpoints.append(f"JSON Resource: {href}")
 
-    # Regex scan script contents for API routes like /api/v1/
+    # Regex scan script contents for API routes like /api/v1/ or WebMCP tool declarations
     scripts = soup.find_all("script")
     found_api_route = False
     for s in scripts:
         if s.string:
+            if "modelContext.registerTool" in s.string or "window.modelContext" in s.string:
+                has_webmcp = True
+                api_score += 4.0
+                discovered_endpoints.append("WebMCP Native Browser Tool Registered")
             matches = re.findall(r'["\'](/api/v[0-9]/[a-zA-Z0-9_\-/]+)["\']', s.string)
             if matches:
                 found_api_route = True
@@ -99,6 +112,8 @@ def score_api_and_data(html: str) -> Dict[str, Any]:
         api_score += 3.5
 
     score += min(7.0, api_score)
+    if has_webmcp:
+        feedback.append("WebMCP (Web Model Context Protocol) agent tooling detected.")
     if discovered_endpoints:
         feedback.append(f"Discovered machine action/API endpoints: {', '.join(discovered_endpoints[:3])}.")
     else:

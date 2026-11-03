@@ -29,7 +29,108 @@ def print_banner():
     ))
 
 
-async def run_audit_command(url: str, json_output: bool = False):
+def save_html_report(audit_result, nav_data, filepath: str):
+    """Generate a self-contained, responsive dark-theme HTML report."""
+    score = audit_result.overall_score
+    grade = audit_result.grade
+    color = "#10b981" if score >= 80 else ("#f59e0b" if score >= 60 else "#ef4444")
+    pillars = audit_result.pillars
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEOForge Audit Report — {audit_result.url}</title>
+    <style>
+        :root {{ --bg: #0b0f19; --card: #111827; --border: #1f2937; --text: #f9fafb; --dim: #9ca3af; }}
+        body {{ margin: 0; padding: 2rem; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
+        .container {{ max-width: 1000px; margin: 0 auto; }}
+        .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; margin-bottom: 2rem; }}
+        .badge {{ background: #0668e1; color: white; padding: 4px 10px; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; }}
+        .hero {{ display: flex; gap: 2rem; align-items: center; background: var(--card); border: 1px solid var(--border); padding: 2rem; border-radius: 1rem; margin-bottom: 2rem; }}
+        .score-circle {{ min-width: 120px; height: 120px; border-radius: 50%; border: 6px solid {color}; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold; color: {color}; }}
+        .score-grade {{ font-size: 1rem; color: var(--dim); }}
+        .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem; }}
+        .card {{ background: var(--card); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.25rem; }}
+        .card h3 {{ margin-top: 0; font-size: 0.95rem; color: var(--dim); font-weight: 500; }}
+        .card .val {{ font-size: 1.5rem; font-weight: bold; margin: 0.5rem 0; color: #38bdf8; }}
+        .list-section {{ background: var(--card); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.5rem; }}
+        .list-section h2 {{ margin-top: 0; font-size: 1.15rem; }}
+        .item {{ padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.95rem; }}
+        .item:last-child {{ border-bottom: none; }}
+        .code-box {{ background: #000; border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem; font-family: monospace; font-size: 0.85rem; overflow-x: auto; color: #a7f3d0; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1 style="margin: 0; font-size: 1.5rem;">⚡ AEOForge Audit Report</h1>
+                <p style="margin: 4px 0 0; color: var(--dim);">{audit_result.url}</p>
+            </div>
+            <span class="badge">Meta AI Hackathon 2026</span>
+        </div>
+
+        <div class="hero">
+            <div class="score-circle">
+                {score}
+                <span class="score-grade">Grade {grade}</span>
+            </div>
+            <div>
+                <h2 style="margin: 0 0 0.5rem;">{audit_result.status}</h2>
+                <p style="margin: 0; color: var(--dim); line-height: 1.5;">
+                    Visual Guidance: {audit_result.visual_analysis.get('agent_navigation_advice', 'Clean layout.')}
+                </p>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h3>Pillar A: Citability</h3>
+                <div class="val">{pillars['pillar_a_citability']['score']} / 25</div>
+                <small style="color: var(--dim);">Fact Density: {pillars['pillar_a_citability']['details']['fact_density_pct']}%</small>
+            </div>
+            <div class="card">
+                <h3>Pillar B: Navigability</h3>
+                <div class="val">{pillars['pillar_b_navigability']['score']} / 25</div>
+                <small style="color: var(--dim);">Token Ratio: {pillars['pillar_b_navigability']['details']['token_ratio_pct']}%</small>
+            </div>
+            <div class="card">
+                <h3>Pillar C: Protocols</h3>
+                <div class="val">{pillars['pillar_c_protocols']['score']} / 25</div>
+                <small style="color: var(--dim);">llms.txt: {'Detected' if pillars['pillar_c_protocols']['details']['has_llms_txt'] else 'Missing'}</small>
+            </div>
+            <div class="card">
+                <h3>Pillar D: Structured Data</h3>
+                <div class="val">{pillars['pillar_d_structured_data']['score']} / 25</div>
+                <small style="color: var(--dim);">Schemas: {len(pillars['pillar_d_structured_data']['details']['schema_types'])}</small>
+            </div>
+        </div>
+
+        <div class="list-section">
+            <h2 style="color: #34d399;">✅ Key Strengths</h2>
+            {"".join(f'<div class="item">✓ {s}</div>' for s in audit_result.key_strengths)}
+        </div>
+
+        <div class="list-section">
+            <h2 style="color: #f87171;">⚠️ Critical Agent Blockers & Traps</h2>
+            {"".join(f'<div class="item">✗ {b}</div>' for b in audit_result.critical_blockers) if audit_result.critical_blockers else '<div class="item">Zero critical navigation traps detected.</div>'}
+        </div>
+
+        <div class="list-section">
+            <h2 style="color: #fbbf24;">🛠️ Priority Remediation Action Plan</h2>
+            {"".join(f'<div class="item">{i}. {a}</div>' for i, a in enumerate(audit_result.action_plan, 1))}
+        </div>
+    </div>
+</body>
+</html>
+"""
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(html_content)
+
+
+async def run_audit_command(url: str, json_output: bool = False, html_output: str = None):
     """Execute audit command."""
     if not json_output:
         print_banner()
@@ -58,6 +159,10 @@ async def run_audit_command(url: str, json_output: bool = False):
             a11y_tree=nav_data.a11y_tree,
             screenshot_b64=nav_data.screenshot_base64
         )
+
+    if html_output:
+        save_html_report(audit_result, nav_data, html_output)
+        console.print(f"[bold green]✨ Interactive HTML report saved to {html_output}[/bold green]\n")
 
     if json_output:
         print(json.dumps(audit_result.model_dump(), indent=2))
@@ -194,6 +299,7 @@ def main():
     audit_parser = subparsers.add_parser("audit", help="Audit website for AEO & Agentic Readiness")
     audit_parser.add_argument("url", help="Target website URL to inspect")
     audit_parser.add_argument("--json", action="store_true", help="Output pure JSON")
+    audit_parser.add_argument("--html", default=None, help="Save interactive HTML report to file")
 
     # spec subcommand
     spec_parser = subparsers.add_parser("spec", help="Generate agent-spec.json and llms.txt")
@@ -213,7 +319,7 @@ def main():
     args = parser.parse_args()
 
     if args.command == "audit":
-        asyncio.run(run_audit_command(args.url, json_output=args.json))
+        asyncio.run(run_audit_command(args.url, json_output=args.json, html_output=args.html))
     elif args.command == "spec":
         asyncio.run(run_spec_command(args.url, out_dir=args.out_dir))
     elif args.command == "patch":

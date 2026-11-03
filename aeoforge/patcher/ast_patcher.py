@@ -56,7 +56,8 @@ class CodebasePatcher:
         except Exception as e:
             results.append({"file": spec_path, "action": "error", "error": str(e)})
 
-        # 4. Inject Schema.org JSON-LD into index.html if present
+        # 4. Inject Schema.org JSON-LD and Agent Handshake headers into index.html if present
+        # shortcut: modifies static index.html; upgrade to JSX/TSX AST parser (Babel/SWC) for React App Router layout.tsx
         index_html_path = os.path.join(self.target_dir, "index.html")
         if not os.path.exists(index_html_path):
             index_html_path = os.path.join(public_dir, "index.html")
@@ -66,15 +67,23 @@ class CodebasePatcher:
                 with open(index_html_path, "r", encoding="utf-8") as f:
                     content = f.read()
 
-                script_tag = f'\n    <script type="application/ld+json">\n{json.dumps(schema_data, indent=6)}\n    </script>\n'
-                if "application/ld+json" not in content and "</head>" in content:
-                    patched = content.replace("</head>", f"{script_tag}</head>", 1)
+                injections = []
+                if 'rel="alternate" type="text/markdown"' not in content:
+                    injections.append('    <link rel="alternate" type="text/markdown" href="/llms.txt" title="LLM Context">')
+                if 'name="agent-spec"' not in content:
+                    injections.append('    <meta name="agent-spec" content="/agent-spec.json">')
+                if "application/ld+json" not in content:
+                    injections.append(f'    <script type="application/ld+json">\n{json.dumps(schema_data, indent=6)}\n    </script>')
+
+                if injections and "</head>" in content:
+                    inject_str = "\n" + "\n".join(injections) + "\n"
+                    patched = content.replace("</head>", f"{inject_str}</head>", 1)
                     with open(index_html_path, "w", encoding="utf-8") as f:
                         f.write(patched)
                     results.append({
                         "file": index_html_path,
                         "action": "injected",
-                        "artifact": "Schema.org JSON-LD"
+                        "artifact": "Agent Handshake & Schema.org JSON-LD"
                     })
             except Exception as e:
                 results.append({"file": index_html_path, "action": "error", "error": str(e)})

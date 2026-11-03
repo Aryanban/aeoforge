@@ -40,12 +40,34 @@ KNOWN_TRAP_SIGNATURES = [
         "dismiss_selectors": ["button[aria-label*='close' i]", "button[class*='close' i]", ".modal-close", ".btn-close"],
         "category": "modal_overlay",
         "severity": "high"
+    },
+    {
+        "name": "Cloudflare Turnstile Challenge",
+        "selectors": ["iframe[src*='challenges.cloudflare.com']", ".cf-turnstile", "#cf-turnstile-wrapper"],
+        "dismiss_selectors": [],
+        "category": "bot_challenge",
+        "severity": "critical"
+    },
+    {
+        "name": "Google reCAPTCHA Challenge",
+        "selectors": ["iframe[src*='google.com/recaptcha']", ".g-recaptcha"],
+        "dismiss_selectors": [],
+        "category": "bot_challenge",
+        "severity": "critical"
+    },
+    {
+        "name": "hCaptcha Challenge",
+        "selectors": ["iframe[src*='hcaptcha.com']", ".h-captcha"],
+        "dismiss_selectors": [],
+        "category": "bot_challenge",
+        "severity": "critical"
     }
 ]
 
 
 async def detect_navigation_traps(page) -> List[Dict[str, Any]]:
     """Scan the rendered DOM for active modal overlays, cookie walls, and agent blockers."""
+    # shortcut: signature list covers top 5 CMPs and 3 captchas; upgrade to visual ML model if custom canvas modals appear
     detected_traps: List[Dict[str, Any]] = []
 
     # 1. Check known signature selectors
