@@ -1,101 +1,126 @@
-/* AEOForge Modern Technical Styling */
+/* AEOForge Ultra-Premium Engineering Studio Styling */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
 :root {
-  --bg-dark: #0a0e17;
-  --bg-card: #111827;
-  --bg-card-hover: #162032;
-  --border-color: #1f293d;
-  --border-glow: rgba(56, 117, 246, 0.25);
-  --text-main: #f1f5f9;
-  --text-muted: #94a3b8;
-  --accent-meta: #3b82f6;
-  --accent-cyan: #06b6d4;
-  --accent-green: #10b981;
-  --accent-amber: #f59e0b;
-  --accent-red: #ef4444;
+  --bg-canvas: #09090b;
+  --bg-surface: #111115;
+  --bg-surface-elevated: #18181d;
+  --bg-surface-hover: #22222b;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #71717a;
+  --accent-meta: #2563eb;
+  --accent-meta-light: #60a5fa;
+  --signal-success: #10b981;
+  --signal-warning: #f59e0b;
+  --signal-danger: #f43f5e;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
-  background-color: var(--bg-dark);
-  color: var(--text-main);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
-  letter-spacing: -0.01em;
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.015em;
+  margin: 0;
+  padding: 0;
 }
 
-/* Custom Scrollbar */
+/* Monospace text */
+.font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: -0.02em;
+}
+
+/* Custom Minimal Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg-dark);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #253347;
+  background: rgba(255, 255, 255, 0.14);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #374b67;
+  background: rgba(255, 255, 255, 0.28);
 }
 
-/* Smooth transitions */
-.transition-smooth {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+/* Minimal surface borders */
+.surface-border {
+  border: 1px solid var(--border-subtle);
 }
 
-/* Glassmorphism panels */
-.glass-panel {
-  background: rgba(17, 24, 39, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border-color);
+.surface-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
 }
 
-.glass-panel:hover {
-  border-color: rgba(56, 117, 246, 0.35);
+.surface-card:hover {
+  border-color: var(--border-strong);
 }
 
-/* Glowing active tab */
-.tab-active {
-  background-color: #1e293b;
-  color: #38bdf8;
-  border-bottom: 2px solid #38bdf8;
+/* Tab active indicator */
+.tab-btn-active {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
-/* Score Ring Animation */
-.score-ring {
-  transition: stroke-dashoffset 1s ease-in-out;
+/* Premium SoM Badges */
+.som-badge-pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(244, 63, 94, 0.15);
+  border: 1px solid rgba(244, 63, 94, 0.4);
+  color: #fda4af;
+  display: inline-block;
+}
+
+/* Score Dial Animation */
+.score-circle-track {
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.16, 1, 0.3, 1);
   transform: rotate(-90deg);
   transform-origin: 50% 50%;
 }
 
-/* Set-of-Mark Badge in UI */
-.som-badge-pill {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.75rem;
-  padding: 2px 6px;
+/* Slide-over drawers */
+.drawer-backdrop {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+}
+
+/* Code block styling */
+pre.code-surface {
+  background: #060608;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: #e4e4e7;
+}
+
+/* Keyboard chip */
+.kbd-chip {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 4px;
-  background: #ef4444;
-  color: #ffffff;
-  font-weight: 700;
-  display: inline-block;
-}
-
-/* Pulsing Status Dot */
-@keyframes pulseGlow {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(1.15); }
-}
-
-.pulse-active {
-  animation: pulseGlow 2s infinite ease-in-out;
-}
-
-/* Syntax pre block */
-pre.code-view {
-  background: #06090e;
-  border: 1px solid #1a2333;
-  border-radius: 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.825rem;
-  line-height: 1.5;
-  color: #e2e8f0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  padding: 1px 4px;
+  color: #a1a1aa;
 }
