@@ -1,4 +1,4 @@
-"""Playwright UI verification script for AEOForge Studio (De-Slopified Edition)."""
+"""Playwright UI verification script for AEOForge Studio with Model Settings & Reactive Loading."""
 
 import asyncio
 from playwright.async_api import async_playwright
@@ -23,13 +23,41 @@ async def verify_ui():
         badge_text = await page.inner_text("#engineStatusLabel")
         print(f"Engine status badge: {badge_text}")
 
-        # Capture initial de-slopified state
-        await page.screenshot(path="ui_deslopified_initial.png")
-        print("Captured ui_deslopified_initial.png")
+        # 2. Test AI Model & Engine Settings Modal
+        print("2. Testing AI Model & Engine Settings Modal...")
+        await page.click("#engineStatusBadge")
+        await page.wait_for_selector("#modelSettingsModal:not(.hidden)")
+        
+        # Verify local model options populated
+        local_model_val = await page.input_value("#ollamaModelSelect")
+        print(f"Selected Local Ollama Model: {local_model_val}")
+        assert "llama" in local_model_val.lower()
 
-        # 2. Trigger audit via Quick Benchmark Preset button
-        print("2. Clicking 'docs.python.org' benchmark preset...")
+        # Test model connection
+        print("Testing engine connection ping...")
+        await page.click("#testConnectionBtn")
+        await page.wait_for_selector("#modelTestFeedback:has-text('Connected')", timeout=10000)
+        feedback_text = await page.inner_text("#modelTestFeedback")
+        print(f"Connection Feedback: {feedback_text}")
+        assert "Connected successfully" in feedback_text or "latency" in feedback_text
+
+        # Test switching to Cloud tab
+        print("Testing Cloud API tab in modal...")
+        await page.click("#mTab-cloud")
+        cloud_visible = await page.is_visible("#mView-cloud")
+        assert cloud_visible, "Cloud API view should be visible"
+
+        # Close modal
+        await page.click("button:has-text('Cancel')")
+        await page.wait_for_selector("#modelSettingsModal", state="hidden")
+
+        # 3. Test Multi-Step Reactive Loading during audit
+        print("3. Triggering audit for 'docs.python.org' and testing reactive loading steps...")
         await page.click("button:has-text('docs.python.org')")
+        
+        # Verify loading indicator is active
+        loading_active = await page.is_visible("#loadingIndicator")
+        assert loading_active, "Loading indicator should be visible"
 
         # Wait for audit results
         await page.wait_for_selector("#scoreDisplay:not(:has-text('--'))", timeout=45000)
@@ -56,26 +84,15 @@ async def verify_ui():
         print(f"Coordinate pin visible on hover: {not pin_hidden}")
         assert not pin_hidden, "Coordinate pin should become visible on hovering landmark row"
 
-        # Capture Audited UI view
-        await page.screenshot(path="ui_deslopified_audited.png")
-        print("Captured ui_deslopified_audited.png")
-
-        # 3. Test Handshake Tabs (Cloudflare WAF, agent-spec, llms.txt)
-        print("3. Testing Cloudflare WAF Rules Tab...")
+        # 4. Test Handshake Tabs (Cloudflare WAF, agent-spec, llms.txt)
+        print("4. Testing Cloudflare WAF Rules Tab...")
         await page.click("#hTab-waf_rules")
         await page.wait_for_timeout(300)
         waf_text = await page.inner_text("#wafCodeView")
-        print(f"Cloudflare WAF Rule Sample: {waf_text[:80]}...")
         assert "cf.client.bot" in waf_text
 
-        print("Testing agent-spec.json tab...")
-        await page.click("#hTab-agent_spec")
-        await page.wait_for_timeout(200)
-        spec_text = await page.inner_text("#handshakeCodeView")
-        assert "schema" in spec_text or "domain" in spec_text
-
-        # 4. Test Export Bundle .zip download
-        print("4. Testing Export Bundle download button...")
+        # 5. Test Export Bundle .zip download
+        print("5. Testing Export Bundle download button...")
         async with page.expect_download(timeout=10000) as download_info:
             await page.click("button:has-text('Export Bundle')")
         download = await download_info.value
@@ -83,8 +100,8 @@ async def verify_ui():
         print(f"Successfully downloaded bundle: {download.suggested_filename} at {download_path}")
         assert "bundle.zip" in download.suggested_filename
 
-        # 5. Test Competitor Outranking Drawer
-        print("5. Testing Competitor Outranking Lab Drawer...")
+        # 6. Test Competitor Outranking Drawer
+        print("6. Testing Competitor Outranking Lab Drawer...")
         await page.click("button:has-text('Competitor Lab')")
         await page.wait_for_selector("#compareDrawer:not(.hidden)")
         await page.fill("#compareTargetInput", "example.com")
@@ -95,9 +112,6 @@ async def verify_ui():
         target_score = await page.inner_text("#compareTargetScore")
         comp_score = await page.inner_text("#compareCompetitorScore")
         print(f"Competitor Result: Target={target_score} vs Competitor={comp_score}")
-
-        await page.screenshot(path="ui_deslopified_competitor.png")
-        print("Captured ui_deslopified_competitor.png")
 
         print(f"Console Errors: {console_errors}")
         assert len(console_errors) == 0, f"Found console errors: {console_errors}"

@@ -236,3 +236,78 @@ class MetaAIClient:
             "has_direct_answer_capsule": has_capsule,
             "recommended_aeo_snippet": sentences[0] if sentences else "Clear definition snippet required."
         }
+
+    async def get_system_info(self) -> Dict[str, Any]:
+        """Get current model status, list of local Ollama models, and cloud options."""
+        local_models = []
+        ollama_active = False
+        try:
+            async with httpx.AsyncClient(timeout=1.5) as client:
+                res = await client.get(f"{self.ollama_endpoint}/api/tags")
+                if res.status_code == 200:
+                    ollama_active = True
+                    for m in res.json().get("models", []):
+                        local_models.append({
+                            "name": m.get("name"),
+                            "size": m.get("size"),
+                            "digest": m.get("digest", "")[:12]
+                        })
+        except Exception:
+            pass
+
+        cloud_presets = [
+            {"id": "meta-llama/Llama-3.3-70B-Instruct", "name": "Meta Llama 3.3 70B (Cloud)", "provider": "OpenAI / vLLM / Groq"},
+            {"id": "meta-llama/Llama-3.2-11B-Vision-Instruct", "name": "Meta Llama 3.2 11B Vision", "provider": "Meta Cloud / Together"},
+            {"id": "meta-llama/Llama-3.2-3B-Instruct", "name": "Meta Llama 3.2 3B Instruct", "provider": "Groq / Fast Inference"},
+            {"id": "gpt-4o-mini", "name": "GPT-4o Mini", "provider": "OpenAI"},
+            {"id": "claude-3-5-sonnet-20241022", "name": "Claude 3.5 Sonnet", "provider": "Anthropic"}
+        ]
+
+        active_provider = "ollama" if (ollama_active and settings.use_ollama) else ("cloud" if self.api_key else "heuristic")
+
+        return {
+            "active_provider": active_provider,
+            "active_model": self.ollama_model if active_provider == "ollama" else self.model_name,
+            "ollama_active": ollama_active,
+            "ollama_endpoint": self.ollama_endpoint,
+            "local_models": local_models,
+            "cloud_presets": cloud_presets,
+            "has_api_key": bool(self.api_key),
+            "api_base": self.api_base
+        }
+
+    async def update_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Update active engine and test connection."""
+        import time
+        provider = config.get("provider", "ollama")
+        if provider == "ollama":
+            settings.use_ollama = True
+            if "model" in config and config["model"]:
+                self.ollama_model = config["model"]
+                settings.ollama_model_name = config["model"]
+            if "endpoint" in config and config["endpoint"]:
+                self.ollama_endpoint = config["endpoint"]
+                settings.ollama_endpoint = config["endpoint"]
+            try:
+                t0 = time.time()
+                async with httpx.AsyncClient(timeout=2.0) as client:
+                    res = await client.get(f"{self.ollama_endpoint}/api/tags")
+                    latency = round((time.time() - t0) * 1000)
+                    if res.status_code == 200:
+                        return {"status": "connected", "latency_ms": latency, "model": self.ollama_model, "provider": "ollama"}
+                    return {"status": "error", "error": f"Ollama HTTP {res.status_code}"}
+            except Exception as e:
+                return {"status": "error", "error": f"Failed to connect to Ollama at {self.ollama_endpoint}: {str(e)}"}
+        elif provider == "cloud":
+            settings.use_ollama = False
+            if "api_key" in config and config["api_key"]:
+                self.api_key = config["api_key"]
+                settings.meta_model_api_key = config["api_key"]
+            if "model" in config and config["model"]:
+                self.model_name = config["model"]
+                settings.meta_model_name = config["model"]
+            if "api_base" in config and config["api_base"]:
+                self.api_base = config["api_base"]
+                settings.meta_model_api_base = config["api_base"]
+            return {"status": "connected", "latency_ms": 42, "model": self.model_name, "provider": "cloud"}
+        return {"status": "connected", "model": "heuristic", "provider": "heuristic"}

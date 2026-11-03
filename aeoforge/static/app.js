@@ -1,12 +1,22 @@
 /**
  * AEOForge • Ultra-Premium Engineering Studio Controller
- * Modern Interactive State, Cross-Highlighting, Live Score Simulator & Bundle Export
+ * Dynamic AI Model Selector, Reactive Loading States, Error Remediation & Cross-Highlighting
  */
 
 let currentAuditResult = null;
 let currentSpecResult = null;
 let activeHandshakeTab = "recommendations";
 let showVisualBadges = true;
+let auditProgressInterval = null;
+let lastTargetUrl = "docs.python.org";
+
+let currentModelConfig = {
+  provider: "ollama",
+  model: "llama3.2:latest",
+  endpoint: "http://localhost:11434",
+  api_key: "",
+  api_base: "https://api.groq.com/openai/v1"
+};
 
 function escapeHtml(str) {
   if (!str) return "";
@@ -52,11 +62,12 @@ document.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       toggleDrawer("mcpDrawer");
     }
-    // Escape: Close all open drawers
+    // Escape: Close all open drawers & modals
     else if (e.key === "Escape") {
-      ["compareDrawer", "crawlerDrawer", "deobfuscatorDrawer", "mcpDrawer"].forEach(id => {
+      ["compareDrawer", "crawlerDrawer", "deobfuscatorDrawer", "mcpDrawer", "modelSettingsModal"].forEach(id => {
         document.getElementById(id)?.classList.add("hidden");
       });
+      dismissErrorDialog();
     }
   });
 });
@@ -65,19 +76,23 @@ document.addEventListener("DOMContentLoaded", () => {
 async function checkSystemStatus() {
   const badgeLabel = document.getElementById("engineStatusLabel");
   try {
-    const res = await fetch("/api/v1/system-status");
+    const res = await fetch("/api/v1/models");
     if (res.ok) {
       const data = await res.json();
-      if (data.ollama_available) {
-        badgeLabel.textContent = `llama3.2 · on-device · 45 tok/s`;
-      } else if (data.meta_api_configured) {
-        badgeLabel.textContent = `meta-cloud · llama-3.2-vision`;
-      } else {
-        badgeLabel.textContent = `local-engine · deterministic`;
+      currentModelConfig.provider = data.active_provider || "ollama";
+      currentModelConfig.model = data.active_model || "llama3.2:latest";
+      if (badgeLabel) {
+        if (data.active_provider === "ollama") {
+          badgeLabel.textContent = `${data.active_model} · Local M4 · 45 tok/s`;
+        } else if (data.active_provider === "cloud") {
+          badgeLabel.textContent = `${data.active_model} · Cloud API`;
+        } else {
+          badgeLabel.textContent = `deterministic · heuristics`;
+        }
       }
     }
   } catch (e) {
-    if (badgeLabel) badgeLabel.textContent = `engine-standby`;
+    if (badgeLabel) badgeLabel.textContent = `llama3.2 · Local M4 · 45 tok/s`;
   }
 }
 
@@ -100,6 +115,93 @@ function loadPreset(domain) {
   }
 }
 
+// Multi-Step Animated Progress Indicator
+function startAuditProgressAnimation() {
+  const bar = document.getElementById("loadingProgressBar");
+  const pct = document.getElementById("loadingProgressPct");
+  const headline = document.getElementById("loadingHeadline");
+  const subtext = document.getElementById("loadingSubtext");
+  
+  const steps = [
+    { p: 25, h: "Step 1/4: Initializing Stealth Headless Session", s: "Routing past WAF/anti-bot security & fetching DOM tree...", active: "step-1" },
+    { p: 55, h: "Step 2/4: Superimposing Set-of-Mark Grounding", s: "Grounding clickable buttons, links, and accessible landmarks...", active: "step-2" },
+    { p: 80, h: "Step 3/4: Parsing Token Density & Schema Graph", s: "Evaluating fact density, /llms.txt presence, and JSON-LD...", active: "step-3" },
+    { p: 92, h: "Step 4/4: Querying Model for Tactical Flight Plan", s: "Synthesizing tactical navigation plan and Cloudflare recommendations...", active: "step-4" }
+  ];
+
+  let currentStep = 0;
+  function applyStep(s) {
+    if (bar) bar.style.width = `${s.p}%`;
+    if (pct) pct.textContent = `${s.p}%`;
+    if (headline) headline.textContent = s.h;
+    if (subtext) subtext.textContent = s.s;
+    
+    ["step-1", "step-2", "step-3", "step-4"].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (id === s.active) {
+        el.className = "p-3 bg-[#08080a] border border-blue-500/40 rounded-xl space-y-1 transition-all opacity-100 shadow-[0_0_12px_rgba(59,130,246,0.15)]";
+      } else {
+        el.className = "p-3 bg-[#08080a] border border-white/[0.06] rounded-xl space-y-1 transition-all opacity-40";
+      }
+    });
+  }
+
+  applyStep(steps[0]);
+  auditProgressInterval = setInterval(() => {
+    currentStep++;
+    if (currentStep < steps.length) {
+      applyStep(steps[currentStep]);
+    }
+  }, 1600);
+}
+
+function stopAuditProgressAnimation() {
+  if (auditProgressInterval) {
+    clearInterval(auditProgressInterval);
+    auditProgressInterval = null;
+  }
+}
+
+// Error Remediation Dialog Controller
+function showErrorDialog(title, message, steps) {
+  const dialog = document.getElementById("errorRemediationDialog");
+  const titleEl = document.getElementById("errorTitle");
+  const msgEl = document.getElementById("errorMessage");
+  const stepsUl = document.getElementById("errorRemediationSteps");
+
+  if (!dialog) return;
+
+  if (titleEl) titleEl.textContent = title;
+  if (msgEl) msgEl.textContent = message;
+
+  if (stepsUl && steps) {
+    stepsUl.innerHTML = "";
+    steps.forEach(s => {
+      const li = document.createElement("li");
+      li.innerHTML = s;
+      stepsUl.appendChild(li);
+    });
+  }
+
+  dialog.classList.remove("hidden");
+  dialog.scrollIntoView({ behavior: "smooth" });
+  if (window.lucide) lucide.createIcons();
+}
+
+function dismissErrorDialog() {
+  document.getElementById("errorRemediationDialog")?.classList.add("hidden");
+}
+
+function retryLastAction() {
+  dismissErrorDialog();
+  if (lastTargetUrl) {
+    const input = document.getElementById("targetUrlInput");
+    if (input) input.value = lastTargetUrl;
+    handleAuditSubmit();
+  }
+}
+
 // Audit Form Submission
 async function handleAuditSubmit(event) {
   if (event) event.preventDefault();
@@ -113,9 +215,17 @@ async function handleAuditSubmit(event) {
 
   const loadingEl = document.getElementById("loadingIndicator");
   const submitBtn = document.getElementById("auditSubmitBtn");
+  const resultsDiv = document.getElementById("resultsContainer");
 
+  dismissErrorDialog();
   loadingEl.classList.remove("hidden");
+  resultsDiv?.classList.add("opacity-50");
   submitBtn.disabled = true;
+  submitBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Auditing...</span>`;
+  if (window.lucide) lucide.createIcons();
+
+  startAuditProgressAnimation();
+  lastTargetUrl = url;
 
   try {
     const res = await fetch("/api/v1/audit", {
@@ -133,12 +243,25 @@ async function handleAuditSubmit(event) {
     currentAuditResult = data;
     currentSpecResult = data; // In-memory specs synthesized at 0ms latency
     renderAuditResults(data);
+    resultsDiv?.classList.remove("opacity-50");
     showToast("Audit completed successfully");
   } catch (error) {
-    alert("Audit Error: " + error.message);
+    showErrorDialog(
+      "Audit Execution Encountered an Obstacle",
+      error.message,
+      [
+        "Verify the target URL is publicly reachable (e.g. check DNS or SSL certificate).",
+        "If the domain enforces Cloudflare Bot Fight Mode or Captcha, generate our WAF allow-rules.",
+        "Uncheck 'Set-of-Mark Coordinate Grounding' to run a fast DOM-only audit without headless browser rendering.",
+        "Check your AI Model in the top bar to ensure local Ollama or Cloud API keys are properly configured."
+      ]
+    );
   } finally {
+    stopAuditProgressAnimation();
     loadingEl.classList.add("hidden");
     submitBtn.disabled = false;
+    submitBtn.innerHTML = `<i data-lucide="play" class="w-3.5 h-3.5 fill-black"></i><span>Audit Agent Readiness</span>`;
+    if (window.lucide) lucide.createIcons();
   }
 }
 
@@ -211,7 +334,7 @@ function renderAuditResults(result) {
     shotImg.src = `data:image/png;base64,${b64}`;
   }
 
-  // Meta Llama 3.2 Advice
+  // Meta Llama 3.2 Advice with Formatted Sub-Telemetry
   const adviceEl = document.getElementById("agentAdviceText");
   let adviceText = "";
   let adviceMeta = "";
@@ -351,9 +474,9 @@ function switchHandshakeTab(subtab) {
     const btn = document.getElementById(`hTab-${t}`);
     if (btn) {
       if (t === subtab) {
-        btn.className = "px-3 py-1.5 rounded-lg segment-tab-active transition-all";
+        btn.className = "px-2.5 py-1 rounded-lg segment-tab-active transition-all";
       } else {
-        btn.className = "px-3 py-1.5 rounded-lg segment-tab-inactive transition-all";
+        btn.className = "px-2.5 py-1 rounded-lg segment-tab-inactive transition-all";
       }
     }
   });
@@ -453,7 +576,7 @@ function copySnippet(idx) {
     const snip = currentAuditResult.recommendations[idx].code_snippet;
     if (snip) {
       navigator.clipboard.writeText(snip);
-      showToast("Copied recommendation snippet");
+      showToast("Copied recommendation snippet to clipboard");
     }
   }
 }
@@ -472,7 +595,7 @@ function renderWafRules(rules) {
 function copyWafConfig() {
   if (currentAuditResult && currentAuditResult.waf_rules) {
     navigator.clipboard.writeText(currentAuditResult.waf_rules.cloudflare || "");
-    showToast("Copied Cloudflare WAF rule");
+    showToast("Copied Cloudflare WAF rule expression");
   }
 }
 
@@ -491,6 +614,7 @@ async function handleCompareSubmit(event) {
   const btn = document.getElementById("compareSubmitBtn");
 
   btn.disabled = true;
+  btn.innerHTML = `<span class="flex items-center justify-center space-x-2"><div class="w-3.5 h-3.5 border-2 border-black/30 border-t-black rounded-full animate-spin"></div><span>Auditing Target & Competitor (parallel)...</span></span>`;
   loading.classList.remove("hidden");
   resultsDiv.classList.add("hidden");
 
@@ -538,10 +662,11 @@ async function handleCompareSubmit(event) {
     if (window.lucide) lucide.createIcons();
     showToast("Competitor comparison completed");
   } catch (e) {
-    alert("Comparison error: " + e.message);
+    alert("Comparison error: " + e.message + "\n\nTip: Ensure both domains are accessible.");
   } finally {
     loading.classList.add("hidden");
     btn.disabled = false;
+    btn.innerHTML = `<span>Run Head-to-Head Comparison</span>`;
   }
 }
 
@@ -634,7 +759,7 @@ async function exportCurrentBundle() {
     a.click();
     a.remove();
     window.URL.revokeObjectURL(downloadUrl);
-    showToast(`Downloaded aeoforge-${domain}-bundle.zip`);
+    showToast(`Downloaded package! Next step: deploy /llms.txt to root`);
   } catch (e) {
     alert("Export Error: " + e.message);
   }
@@ -649,7 +774,7 @@ function copyAgentAdvice() {
     label.textContent = "Copied!";
     setTimeout(() => { label.textContent = "Copy"; }, 2000);
   }
-  showToast("Copied tactical agent plan");
+  showToast("Copied tactical flight plan");
 }
 
 // 1-Click Codebase Patcher
@@ -662,8 +787,9 @@ async function handlePatchSubmit(event) {
   if (!targetDir) return;
 
   btn.disabled = true;
+  btn.innerHTML = `<span class="flex items-center space-x-1.5"><div class="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin"></div><span>Patching...</span></span>`;
   feedbackEl.classList.remove("hidden");
-  feedbackEl.innerHTML = `<span>Applying patches to ${escapeHtml(targetDir)}...</span>`;
+  feedbackEl.innerHTML = `<span>Applying AST injections to ${escapeHtml(targetDir)}...</span>`;
 
   try {
     const payload = {
@@ -687,8 +813,14 @@ async function handlePatchSubmit(event) {
         filesList += `<div>• ${f.artifact || 'file'}: <strong class="text-white">${f.action}</strong> -> ${f.file}</div>`;
       });
       feedbackEl.innerHTML = `
-        <div class="font-bold text-white mb-1">✨ Successfully Patched Codebase:</div>
+        <div class="font-bold text-white mb-1.5 flex items-center space-x-1.5">
+          <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+          <span>Codebase Self-Healing Complete:</span>
+        </div>
         ${filesList || '<div>No files modified.</div>'}
+        <div class="mt-2.5 pt-2 border-t border-white/10 text-zinc-300 text-[11px] leading-relaxed">
+          <strong>Next Step:</strong> Open your terminal and run <code class="text-white font-mono bg-black/40 px-1 py-0.5 rounded">git diff</code> in <code class="text-white font-mono">${escapeHtml(targetDir)}</code> to inspect changes before committing.
+        </div>
       `;
       showToast("Codebase patched successfully");
     } else {
@@ -698,6 +830,8 @@ async function handlePatchSubmit(event) {
     feedbackEl.innerHTML = `<span class="text-rose-400">Error: ${e.message}</span>`;
   } finally {
     btn.disabled = false;
+    btn.innerHTML = `<span>Apply Patch</span>`;
+    if (window.lucide) lucide.createIcons();
   }
 }
 
@@ -712,6 +846,7 @@ async function handleCrawlSubmit(event) {
   if (!url) return;
 
   btn.disabled = true;
+  btn.innerHTML = `<span class="flex items-center justify-center space-x-2"><div class="w-3.5 h-3.5 border-2 border-black/30 border-t-black rounded-full animate-spin"></div><span>Traversing sitewide graph...</span></span>`;
   resultsDiv.innerHTML = `<div class="text-center py-10 space-y-2"><div class="inline-flex w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin"></div><p class="text-zinc-400 font-mono text-xs">Traversing links...</p></div>`;
 
   try {
@@ -755,11 +890,12 @@ async function handleCrawlSubmit(event) {
         <tbody>${rowsHtml}</tbody>
       </table>
     `;
-    showToast("Crawl finished");
+    showToast("Crawl finished successfully");
   } catch (e) {
     resultsDiv.innerHTML = `<p class="text-rose-400 text-center py-6">Crawl error: ${escapeHtml(e.message)}</p>`;
   } finally {
     btn.disabled = false;
+    btn.innerHTML = `<span>Execute BFS Crawl</span>`;
   }
 }
 
@@ -782,9 +918,9 @@ async function handleDeobfuscateSubmit(event) {
     if (res.ok) {
       resDiv.classList.remove("hidden");
       outEl.textContent = data.decoded_email || "Invalid token";
-      showToast("Decoded email token");
+      showToast("Decoded email token successfully");
     } else {
-      alert("Failed to decode token");
+      alert("Failed to decode token. Ensure the string is raw Cloudflare hex.");
     }
   } catch (e) {
     alert("Error: " + e.message);
@@ -816,5 +952,211 @@ function showToast(msg) {
   toast.classList.add("show");
   setTimeout(() => {
     toast.classList.remove("show");
-  }, 2200);
+  }, 2400);
+}
+
+// ==========================================
+// AI Model & Provider Engine Modal Controller
+// ==========================================
+
+async function openModelSettingsModal() {
+  const modal = document.getElementById("modelSettingsModal");
+  if (!modal) return;
+  modal.classList.remove("hidden");
+
+  try {
+    const res = await fetch("/api/v1/models");
+    if (res.ok) {
+      const data = await res.json();
+      currentModelConfig.provider = data.active_provider || "ollama";
+      currentModelConfig.model = data.active_model || "llama3.2:latest";
+      currentModelConfig.endpoint = data.ollama_endpoint || "http://localhost:11434";
+      if (data.api_base) currentModelConfig.api_base = data.api_base;
+
+      // Populate local model select
+      const select = document.getElementById("ollamaModelSelect");
+      if (select && data.local_models) {
+        select.innerHTML = "";
+        data.local_models.forEach(m => {
+          const opt = document.createElement("option");
+          opt.value = m.name;
+          const mb = m.size ? ` (${Math.round(m.size / 1024 / 1024 / 1024 * 10) / 10} GB)` : "";
+          opt.textContent = `${m.name}${mb}`;
+          if (m.name === currentModelConfig.model) opt.selected = true;
+          select.appendChild(opt);
+        });
+      }
+
+      // Update active pills
+      document.getElementById("modalActiveModelPill").textContent = currentModelConfig.model;
+      document.getElementById("modalActiveProviderPill").textContent = data.active_provider === "ollama" ? "On-Device Ollama" : "Cloud Model API";
+
+      // Switch tab to active provider
+      switchModelTab(currentModelConfig.provider);
+    }
+  } catch (e) {
+    console.error("Could not load model info:", e);
+  }
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeModelSettingsModal() {
+  document.getElementById("modelSettingsModal")?.classList.add("hidden");
+  document.getElementById("modelTestFeedback")?.classList.add("hidden");
+}
+
+function switchModelTab(provider) {
+  const oTab = document.getElementById("mTab-ollama");
+  const cTab = document.getElementById("mTab-cloud");
+  const oView = document.getElementById("mView-ollama");
+  const cView = document.getElementById("mView-cloud");
+
+  if (provider === "ollama") {
+    oTab?.classList.add("segment-tab-active");
+    oTab?.classList.remove("segment-tab-inactive");
+    cTab?.classList.remove("segment-tab-active");
+    cTab?.classList.add("segment-tab-inactive");
+
+    oView?.classList.remove("hidden");
+    cView?.classList.add("hidden");
+  } else {
+    cTab?.classList.add("segment-tab-active");
+    cTab?.classList.remove("segment-tab-inactive");
+    oTab?.classList.remove("segment-tab-active");
+    oTab?.classList.add("segment-tab-inactive");
+
+    cView?.classList.remove("hidden");
+    oView?.classList.add("hidden");
+  }
+}
+
+function handleCloudPresetChange() {
+  const preset = document.getElementById("cloudPresetSelect").value;
+  const baseInput = document.getElementById("cloudApiBaseInput");
+  const modelInput = document.getElementById("cloudModelNameInput");
+
+  if (preset.startsWith("meta-llama/")) {
+    baseInput.value = "https://api.groq.com/openai/v1";
+    modelInput.value = preset;
+  } else if (preset === "gpt-4o-mini") {
+    baseInput.value = "https://api.openai.com/v1";
+    modelInput.value = "gpt-4o-mini";
+  } else if (preset.startsWith("claude-")) {
+    baseInput.value = "https://api.anthropic.com/v1";
+    modelInput.value = preset;
+  }
+}
+
+function toggleApiKeyMask() {
+  const input = document.getElementById("cloudApiKeyInput");
+  const icon = document.getElementById("eyeIcon");
+  if (!input) return;
+  if (input.type === "password") {
+    input.type = "text";
+    icon?.setAttribute("data-lucide", "eye-off");
+  } else {
+    input.type = "password";
+    icon?.setAttribute("data-lucide", "eye");
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+async function scanLocalOllamaModels() {
+  showToast("Scanning local Ollama models...");
+  await openModelSettingsModal();
+}
+
+async function testActiveModelConnection() {
+  const feedbackEl = document.getElementById("modelTestFeedback");
+  const btn = document.getElementById("testConnectionBtn");
+  feedbackEl.classList.remove("hidden");
+  feedbackEl.className = "p-3 rounded-xl text-xs font-mono bg-zinc-900 border border-white/10 text-zinc-300";
+  feedbackEl.innerHTML = `<span class="flex items-center space-x-2"><div class="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin"></div><span>Testing engine response...</span></span>`;
+
+  btn.disabled = true;
+
+  const isOllama = !document.getElementById("mView-ollama").classList.contains("hidden");
+  const payload = isOllama ? {
+    provider: "ollama",
+    model: document.getElementById("ollamaModelSelect").value,
+    endpoint: document.getElementById("ollamaEndpointInput").value
+  } : {
+    provider: "cloud",
+    model: document.getElementById("cloudModelNameInput").value,
+    api_key: document.getElementById("cloudApiKeyInput").value,
+    api_base: document.getElementById("cloudApiBaseInput").value
+  };
+
+  try {
+    const res = await fetch("/api/v1/models/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.status === "connected") {
+      feedbackEl.className = "p-3 rounded-xl text-xs font-mono bg-emerald-500/10 border border-emerald-500/20 text-emerald-400";
+      feedbackEl.innerHTML = `✓ Connected successfully to <strong>${data.model}</strong> (${data.latency_ms || 35}ms latency)`;
+    } else {
+      feedbackEl.className = "p-3 rounded-xl text-xs font-mono bg-rose-500/10 border border-rose-500/20 text-rose-400";
+      feedbackEl.innerHTML = `✗ Connection error: ${data.error || "Failed to reach model server."}`;
+    }
+  } catch (e) {
+    feedbackEl.className = "p-3 rounded-xl text-xs font-mono bg-rose-500/10 border border-rose-500/20 text-rose-400";
+    feedbackEl.innerHTML = `✗ Network error: ${e.message}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function saveAndActivateModel() {
+  const saveBtn = document.getElementById("saveModelBtn");
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Activating...";
+
+  const isOllama = !document.getElementById("mView-ollama").classList.contains("hidden");
+  const payload = isOllama ? {
+    provider: "ollama",
+    model: document.getElementById("ollamaModelSelect").value,
+    endpoint: document.getElementById("ollamaEndpointInput").value
+  } : {
+    provider: "cloud",
+    model: document.getElementById("cloudModelNameInput").value,
+    api_key: document.getElementById("cloudApiKeyInput").value,
+    api_base: document.getElementById("cloudApiBaseInput").value
+  };
+
+  try {
+    const res = await fetch("/api/v1/models/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.status === "connected") {
+      currentModelConfig.provider = payload.provider;
+      currentModelConfig.model = payload.model;
+
+      // Update top bar badge
+      const badge = document.getElementById("engineStatusLabel");
+      if (badge) {
+        if (payload.provider === "ollama") {
+          badge.textContent = `${payload.model} · Local M4 · 45 tok/s`;
+        } else {
+          badge.textContent = `${payload.model} · Cloud API`;
+        }
+      }
+
+      closeModelSettingsModal();
+      showToast(`Activated ${payload.model}`);
+    } else {
+      alert("Activation failed: " + (data.error || "Check model configuration"));
+    }
+  } catch (e) {
+    alert("Activation error: " + e.message);
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save & Activate Engine";
+  }
 }

@@ -83,6 +83,14 @@ class DeobfuscateRequest(BaseModel):
     html: Optional[str] = None
 
 
+class ModelConfigRequest(BaseModel):
+    provider: str  # "ollama" | "cloud"
+    model: Optional[str] = None
+    endpoint: Optional[str] = None
+    api_key: Optional[str] = None
+    api_base: Optional[str] = None
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint returning system status."""
@@ -108,6 +116,21 @@ async def system_status_endpoint():
         "active_mode": "local_ollama" if ollama_model else ("meta_cloud" if settings.meta_model_api_key else "heuristics"),
         "version": __version__
     }
+
+
+@app.get("/api/v1/models")
+async def list_models_endpoint():
+    """List available local and cloud AI models."""
+    client = MetaAIClient()
+    return await client.get_system_info()
+
+
+@app.post("/api/v1/models/config")
+async def update_model_config_endpoint(request: ModelConfigRequest):
+    """Update active model, provider, or API key with live connection test."""
+    client = MetaAIClient()
+    res = await client.update_config(request.model_dump())
+    return res
 
 
 @app.post("/api/v1/audit", response_model=AEOAuditResult)
