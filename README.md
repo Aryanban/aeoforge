@@ -203,23 +203,122 @@ AEOForge integrates algorithmic breakthroughs from the best open-source projects
 
 ---
 
-## 🚀 Quickstart Guide
+## 🚀 Zero-Friction Quickstart Guide
 
-### 1. Installation
+### 1. The Single-Instruction Automated Setup (`setup.sh`)
+
+You do **not** need to install or configure packages manually. Run the automated setup script to verify Python, create the `.venv`, install all dependencies, configure Playwright Chromium, and check Ollama in one shot:
 
 ```bash
 # Clone the repository
 git clone https://github.com/Aryanban/aeoforge.git
 cd aeoforge
 
-# Using uv (recommended for ultra-fast setup)
-uv venv
-source .venv/bin/activate
-uv pip install -e .
+# ⚡ Single-command setup (automated installation & verification)
+./setup.sh
 
-# Install Playwright browser dependencies
-playwright install chromium
+# 🚀 Launch the Web UI & REST API server immediately on http://localhost:8000
+./setup.sh --start
 ```
+
+---
+
+## 💻 Running 100% Locally on a 16GB Laptop
+
+AEOForge is engineered for **100% Local Sovereignty**. You do **not** need external cloud subscriptions or paid API keys. Everything runs comfortably on a standard developer machine (such as a 16GB Apple Silicon Mac or PC):
+
+1. **Local Vision & Reasoning (Meta Llama 3.2 via Ollama)**:
+   ```bash
+   # Install Ollama (macOS: brew install ollama)
+   ollama serve
+   ollama pull llama3.2       # Compact 3.2B parameter model (ultra-fast, ~2.0 GB VRAM)
+   # Or for multimodal vision:
+   ollama pull llama3.2-vision
+   ```
+   AEOForge automatically probes `http://127.0.0.1:11434` on launch. When detected, all citability verification, inverted-pyramid answering, and affordance reasoning execute directly on your local GPU/Metal.
+
+2. **Local Headless Playwright Navigator**:
+   Browser rendering, Set-of-Mark (SoM) bounding box extraction, and accessibility tree parsing run locally inside headless Chromium with zero cloud egress.
+
+3. **Local SQLite Persistent Storage**:
+   Audits, historical domain progressions (`+X pts`), technical preferences, and codebase patch logs are preserved in WAL mode at `data/aeoforge.db`.
+
+4. **Self-Healing AST Codebase Patcher**:
+   Injects generated `llms.txt` and Schema.org JSON-LD directly into client projects on your local filesystem with atomic rollback safety.
+
+---
+
+## 🏆 How to Present AEOForge to Viewers & Judges
+
+When pitching or demonstrating AEOForge, follow this proven **3-Minute Hackathon Demo Narrative**:
+
+```
+1. THE CRISIS (0:00 - 0:45)
+   "The web was engineered for human retinas. But today, the web is browsed by autonomous
+    AI agents and Answer Engines (Meta AI, Perplexity, ChatGPT Search, Claude Computer Use).
+    Over 95% of websites fail agent interaction: they burn 50,000 tokens of DOM bloat,
+    trap agents behind modal walls, lack /llms.txt, and have zero Schema.org entity graphs.
+    When an AI searches the web, unoptimized websites are simply ignored."
+
+2. THE SOLUTION (0:45 - 1:45)
+   "AEOForge is the open-source 'Lighthouse for the Agentic Web'. Powered by Meta Llama 3.2
+    and Playwright, it executes an autonomous 4-Pillar audit in seconds:
+    • Pillar A (Citability): Measures fact-triplet density and inverted-pyramid capsules.
+    • Pillar B (Navigability): Audits accessibility landmarks and detects agent traps.
+    • Pillar C (Machine Protocols): Verifies spec-compliant /llms.txt and crawler policies.
+    • Pillar D (Structured Data): Validates semantic graphs and hidden API endpoints."
+
+3. THE LIVE DEMO & IMPACT (1:45 - 3:00)
+   "Show the Web UI at http://localhost:8000:
+    1. Enter target URL (e.g., https://dholeramap.com) and click 'Audit Website'.
+    2. Inspect the Live Scorecard (66/100 Grade C) and Visual Affordance Grounding (SoM).
+    3. Show the Competitor Comparison Lab (side-by-side agent readiness).
+    4. Click 'Apply Fix to Codebase' — our AST patcher injects compliant llms.txt & JSON-LD!
+    5. Check the Persistent Progression Drawer (⌘H) showing the historical +18 pts jump."
+```
+
+---
+
+## 🔍 Real-World Case Study: Auditing `dholeramap.com`
+
+During testing, AEOForge conducted an autonomous audit on **`https://dholeramap.com/`**. Here is the exact breakdown of the findings and what they reveal:
+
+```
+Target URL: https://dholeramap.com/
+Overall AEO Score: 66.0 / 100 (Grade C — Needs Optimization)
+```
+
+### 1. Pillar Scores & Diagnostic Insights
+* **Pillar A: Citability & Answerability (12.0 / 25)**:
+  - *Finding*: Fact density is **6.5%**. While the page contains an optimal 35–65 word definition block directly under an `H2` heading, it lacks explicit author credentials and verified publication timestamps (E-E-A-T). Answer engines struggle to attribute authority to unsigned claims.
+* **Pillar B: Agent Navigability & Token Cost (17.5 / 25)**:
+  - *Finding*: Token ratio is **4.23%** (heavy text-to-DOM bloat). The raw HTML contains ~25,000 tokens of markup yielding only a fraction of readable content.
+  - *Strength*: **0 Navigation Traps**. The site is clean of intrusive popups, and 100% of interactive elements possess valid accessibility names.
+* **Pillar C: Machine Protocols & Discovery (19.0 / 25)**:
+  - *Strength*: A valid `/llms.txt` file was detected at the domain root!
+  - *Critical Blocker*: Its `robots.txt` actively disallows web crawlers, inadvertently preventing AI answer engines (`Meta-ExternalAgent`, `PerplexityBot`) from indexing the content.
+* **Pillar D: Structured Data & API Exposeability (17.5 / 25)**:
+  - *Critical Blocker*: Zero Schema.org JSON-LD graphs found. Without `WebSite`, `Organization`, or `Place` schemas, knowledge graphs cannot form entity triples.
+
+### 2. Actionable Remediation Plan
+1. Update `robots.txt` to permit official AI agent bots (`Meta-ExternalAgent`, `ClaudeBot`, `PerplexityBot`).
+2. Run `aeoforge patch` to inject structured `Organization` and `Place` Schema.org JSON-LD.
+3. Add signed author capsules and publication dates to elevate E-E-A-T signals.
+
+---
+
+## 🤖 For Autonomous Coding Agents (`AGENTS.md`)
+
+If you are using an AI coding agent (**Cursor**, **Windsurf**, **Claude Code**, **Antigravity**, **Copilot Workspace**), refer to [`AGENTS.md`](AGENTS.md). It outlines:
+- Complete directory architecture and file responsibilities.
+- REST API endpoint catalog (`/api/v1/tools`).
+- Programmatic CLI commands with `--json` outputs.
+- MCP Server setup instructions.
+- Development and `/ponytail` minimal-diff guidelines.
+
+---
+
+## 🚀 Manual CLI & API Quickstart
 
 ### 2. Environment Setup (Tri-Mode Inference)
 

@@ -17,6 +17,7 @@ from aeoforge.spec.llmstxt_gen import generate_llms_txt
 from aeoforge.spec.schema_gen import generate_schema_jsonld
 from aeoforge.patcher.ast_patcher import CodebasePatcher
 from aeoforge.config import settings
+from aeoforge.storage import storage
 
 console = Console()
 
@@ -172,6 +173,15 @@ async def run_audit_command(url: str, json_output: bool = False, html_output: st
                 a11y_tree=nav_data.a11y_tree,
                 screenshot_b64=nav_data.screenshot_base64
             )
+
+            # Persist audit into local SQLite storage
+            try:
+                audit_id, progression = storage.save_audit(nav_data.final_url, audit_result.model_dump())
+                audit_result.audit_id = audit_id
+                audit_result.progression = progression
+            except Exception as e:
+                console.print(f"[dim yellow]Notice: Failed to persist audit to storage: {e}[/dim yellow]")
+
             crawled_results.append((audit_result, nav_data))
 
             # If crawling, discover internal links
