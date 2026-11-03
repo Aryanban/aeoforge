@@ -133,6 +133,38 @@ async def update_model_config_endpoint(request: ModelConfigRequest):
     return res
 
 
+@app.get("/api/v1/tools")
+async def get_agent_tools_endpoint():
+    """Return tool schemas formatted for OpenAI, Anthropic, and MCP agent harnesses."""
+    from aeoforge.mcp_server import MCP_TOOLS
+
+    openai_tools = []
+    anthropic_tools = []
+    for t in MCP_TOOLS:
+        openai_tools.append({
+            "type": "function",
+            "function": {
+                "name": t["name"],
+                "description": t["description"],
+                "parameters": t["inputSchema"]
+            }
+        })
+        anthropic_tools.append({
+            "name": t["name"],
+            "description": t["description"],
+            "input_schema": t["inputSchema"]
+        })
+
+    return {
+        "status": "ready",
+        "version": __version__,
+        "supported_harnesses": ["MCP (Model Context Protocol)", "OpenAI Function Calling", "Anthropic Tool Use", "LangChain", "Cursor", "Windsurf"],
+        "mcp_tools": MCP_TOOLS,
+        "openai_tools": openai_tools,
+        "anthropic_tools": anthropic_tools
+    }
+
+
 @app.post("/api/v1/audit", response_model=AEOAuditResult)
 async def audit_endpoint(request: AuditRequest):
     """Run full visual, semantic, and protocol audit on a target URL."""

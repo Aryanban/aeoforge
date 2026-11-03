@@ -113,6 +113,62 @@ async def verify_ui():
         comp_score = await page.inner_text("#compareCompetitorScore")
         print(f"Competitor Result: Target={target_score} vs Competitor={comp_score}")
 
+        # Close compare drawer
+        await page.keyboard.press("Escape")
+        await page.wait_for_selector("#compareDrawer", state="hidden")
+
+        # 7. Test Theme Switcher (Dark -> Light -> System -> Dark)
+        print("7. Testing Theme Switcher...")
+        await page.click("#themeBtn-light")
+        await page.wait_for_timeout(200)
+        is_light = await page.evaluate("() => !document.documentElement.classList.contains('dark') && document.documentElement.getAttribute('data-theme') === 'light'")
+        assert is_light, "Light theme should remove .dark class and set data-theme='light'"
+        print("✓ Switched to Light Theme successfully")
+
+        await page.click("#themeBtn-dark")
+        await page.wait_for_timeout(200)
+        is_dark = await page.evaluate("() => document.documentElement.classList.contains('dark') && document.documentElement.getAttribute('data-theme') === 'dark'")
+        assert is_dark, "Dark theme should add .dark class and set data-theme='dark'"
+        print("✓ Switched back to Dark Theme successfully")
+
+        await page.click("#themeBtn-system")
+        await page.wait_for_timeout(200)
+        system_stored = await page.evaluate("() => localStorage.getItem('aeoforge-theme') === 'system'")
+        assert system_stored, "System theme preference should be stored in localStorage"
+        print("✓ System Theme preference set successfully")
+
+        # Switch back to dark for standard look
+        await page.click("#themeBtn-dark")
+
+        # 8. Test Accessibility (WCAG 2.1 AA Skip Link & Reduced Motion)
+        print("8. Testing Accessibility Features...")
+        skip_href = await page.get_attribute(".skip-to-content-link", "href")
+        assert skip_href == "#mainWorkspace", "Skip link must point to #mainWorkspace"
+        
+        await page.focus(".skip-to-content-link")
+        is_focused = await page.evaluate("() => document.activeElement.classList.contains('skip-to-content-link')")
+        assert is_focused, "Skip link must be keyboard focusable"
+        print("✓ WCAG Skip to Main Content link verified")
+
+        # Test Reduced Motion toggle in Preferences modal
+        await page.click("#engineStatusBadge")
+        await page.wait_for_selector("#modelSettingsModal:not(.hidden)")
+        await page.click("#mTab-preferences")
+        await page.wait_for_selector("#mView-preferences:not(.hidden)")
+
+        await page.check("#reduceMotionToggle")
+        has_reduced_motion = await page.evaluate("() => document.documentElement.classList.contains('reduce-motion')")
+        assert has_reduced_motion, "Enabling reduceMotionToggle should add .reduce-motion to html"
+        print("✓ Reduced motion toggle activated")
+
+        await page.uncheck("#reduceMotionToggle")
+        no_reduced_motion = await page.evaluate("() => !document.documentElement.classList.contains('reduce-motion')")
+        assert no_reduced_motion, "Disabling reduceMotionToggle should remove .reduce-motion from html"
+        print("✓ Reduced motion toggle deactivated")
+
+        await page.keyboard.press("Escape")
+        await page.wait_for_selector("#modelSettingsModal", state="hidden")
+
         print(f"Console Errors: {console_errors}")
         assert len(console_errors) == 0, f"Found console errors: {console_errors}"
         print("SUCCESS: 0 console errors detected across all flows!")

@@ -29,6 +29,7 @@ function escapeHtml(str) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  initTheme();
   if (window.lucide) {
     lucide.createIcons();
   }
@@ -1007,28 +1008,20 @@ function closeModelSettingsModal() {
 }
 
 function switchModelTab(provider) {
-  const oTab = document.getElementById("mTab-ollama");
-  const cTab = document.getElementById("mTab-cloud");
-  const oView = document.getElementById("mView-ollama");
-  const cView = document.getElementById("mView-cloud");
-
-  if (provider === "ollama") {
-    oTab?.classList.add("segment-tab-active");
-    oTab?.classList.remove("segment-tab-inactive");
-    cTab?.classList.remove("segment-tab-active");
-    cTab?.classList.add("segment-tab-inactive");
-
-    oView?.classList.remove("hidden");
-    cView?.classList.add("hidden");
-  } else {
-    cTab?.classList.add("segment-tab-active");
-    cTab?.classList.remove("segment-tab-inactive");
-    oTab?.classList.remove("segment-tab-active");
-    oTab?.classList.add("segment-tab-inactive");
-
-    cView?.classList.remove("hidden");
-    oView?.classList.add("hidden");
-  }
+  const tabs = ["ollama", "cloud", "preferences"];
+  tabs.forEach(t => {
+    const tabEl = document.getElementById(`mTab-${t}`);
+    const viewEl = document.getElementById(`mView-${t}`);
+    if (t === provider) {
+      tabEl?.classList.add("segment-tab-active");
+      tabEl?.classList.remove("segment-tab-inactive");
+      viewEl?.classList.remove("hidden");
+    } else {
+      tabEl?.classList.remove("segment-tab-active");
+      tabEl?.classList.add("segment-tab-inactive");
+      viewEl?.classList.add("hidden");
+    }
+  });
 }
 
 function handleCloudPresetChange() {
@@ -1160,3 +1153,86 @@ async function saveAndActivateModel() {
     saveBtn.textContent = "Save & Activate Engine";
   }
 }
+
+// Theme & Accessibility Management (WCAG 2.1 AA)
+function initTheme() {
+  const savedTheme = localStorage.getItem("aeoforge-theme") || "dark";
+  const savedMotion = localStorage.getItem("aeoforge-reduce-motion") === "true";
+
+  setTheme(savedTheme, false);
+
+  if (savedMotion) {
+    const motionCb = document.getElementById("reduceMotionToggle");
+    if (motionCb) motionCb.checked = true;
+    toggleReduceMotion(true, false);
+  }
+
+  // Listen to system OS theme changes if user selected 'system'
+  if (window.matchMedia) {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+      if (localStorage.getItem("aeoforge-theme") === "system") {
+        applyTheme("system");
+      }
+    });
+  }
+}
+
+function setTheme(theme, persist = true) {
+  if (persist) {
+    localStorage.setItem("aeoforge-theme", theme);
+    showToast(`Theme switched to ${theme.charAt(0).toUpperCase() + theme.slice(1)}`);
+  }
+  applyTheme(theme);
+}
+
+function applyTheme(theme) {
+  let isDark = true;
+  if (theme === "system") {
+    isDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  } else {
+    isDark = (theme === "dark");
+  }
+
+  const html = document.documentElement;
+  if (isDark) {
+    html.classList.add("dark");
+    html.setAttribute("data-theme", "dark");
+  } else {
+    html.classList.remove("dark");
+    html.setAttribute("data-theme", "light");
+  }
+
+  // Update theme switcher buttons in header
+  ["dark", "light", "system"].forEach(t => {
+    const btn = document.getElementById(`themeBtn-${t}`);
+    if (btn) {
+      if (t === theme) {
+        btn.classList.add("segment-tab-active");
+        btn.classList.remove("segment-tab-inactive");
+        btn.setAttribute("aria-checked", "true");
+      } else {
+        btn.classList.remove("segment-tab-active");
+        btn.classList.add("segment-tab-inactive");
+        btn.setAttribute("aria-checked", "false");
+      }
+    }
+  });
+
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+}
+
+function toggleReduceMotion(enabled, showFeedback = true) {
+  localStorage.setItem("aeoforge-reduce-motion", enabled ? "true" : "false");
+  document.documentElement.classList.toggle("reduce-motion", enabled);
+  if (showFeedback) {
+    showToast(enabled ? "Enforced reduced motion (WCAG 2.1 AA)" : "Default animation timings restored");
+  }
+}
+
+// Expose on window for inline event handlers
+window.initTheme = initTheme;
+window.setTheme = setTheme;
+window.applyTheme = applyTheme;
+window.toggleReduceMotion = toggleReduceMotion;
