@@ -1,6 +1,6 @@
 """Master 4-Pillar AEO & Agent-Readiness Scoring Engine (0 - 100 Points)."""
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 
 from aeoforge.scorer.citability import score_citability
@@ -8,6 +8,9 @@ from aeoforge.scorer.navigability import score_navigability
 from aeoforge.scorer.protocols import score_protocols
 from aeoforge.scorer.api_discovery import score_api_and_data
 from aeoforge.models.meta_client import MetaAIClient
+from aeoforge.spec.spec_generator import generate_agent_spec
+from aeoforge.spec.llmstxt_gen import generate_llms_txt, generate_llms_full_txt
+from aeoforge.spec.schema_gen import generate_schema_jsonld
 
 
 class AEOAuditResult(BaseModel):
@@ -20,6 +23,14 @@ class AEOAuditResult(BaseModel):
     key_strengths: List[str]
     critical_blockers: List[str]
     action_plan: List[str]
+    screenshot_base64: Optional[str] = None
+    interactive_marks: Optional[List[Dict[str, Any]]] = None
+    traps: Optional[List[Dict[str, Any]]] = None
+    title: Optional[str] = None
+    agent_spec: Optional[Dict[str, Any]] = None
+    llms_txt: Optional[str] = None
+    llms_full_txt: Optional[str] = None
+    schema_jsonld: Optional[Dict[str, Any]] = None
 
 
 def calculate_grade(score: float) -> tuple[str, str]:
@@ -98,6 +109,34 @@ class AEOScoringEngine:
         if not p_a["details"]["has_answer_capsule"]:
             action_plan.append("Add concise (35-65 word) factual definition capsules directly beneath H2/H3 headings.")
 
+        # Synthesize Machine-to-Machine specs in memory (zero redundant roundtrips)
+        endpoints = p_d["details"].get("discovered_endpoints", [])
+        spec = generate_agent_spec(
+            url=url,
+            aeo_score=total_score,
+            html=html,
+            traps=traps,
+            interactive_marks=interactive_marks,
+            discovered_endpoints=endpoints
+        )
+        llms_txt = generate_llms_txt(
+            url=url,
+            title=url,
+            text_content=text_content,
+            interactive_marks=interactive_marks
+        )
+        llms_full_txt = generate_llms_full_txt(
+            url=url,
+            title=url,
+            text_content=text_content
+        )
+        schema = generate_schema_jsonld(
+            url=url,
+            title=url,
+            description=text_content[:150],
+            html=html
+        )
+
         return AEOAuditResult(
             url=url,
             overall_score=total_score,
@@ -112,5 +151,12 @@ class AEOScoringEngine:
             visual_analysis=visual_analysis,
             key_strengths=strengths[:5],
             critical_blockers=blockers[:5],
-            action_plan=action_plan or ["Maintain current high-grade agent accessibility."]
+            action_plan=action_plan or ["Maintain current high-grade agent accessibility."],
+            screenshot_base64=screenshot_b64,
+            interactive_marks=interactive_marks,
+            traps=traps,
+            agent_spec=spec,
+            llms_txt=llms_txt,
+            llms_full_txt=llms_full_txt,
+            schema_jsonld=schema
         )
