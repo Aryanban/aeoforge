@@ -130,13 +130,20 @@ def save_html_report(audit_result, nav_data, filepath: str):
         f.write(html_content)
 
 
-async def run_audit_command(url: str, json_output: bool = False, html_output: str = None):
-    """Execute audit command."""
+async def run_audit_command(url: str, json_output: bool = False, html_output: str = None, crawl: bool = False, max_pages: int = 3):
+    """Execute audit command with optional BFS multi-page crawling."""
     if not json_output:
         print_banner()
 
     navigator = BrowserNavigator(headless=settings.playwright_headless)
     scorer = AEOScoringEngine()
+    from urllib.parse import urlparse, urljoin
+
+    crawled_results = []
+    visited_urls = set()
+    queue = [url]
+    parsed_entry = urlparse(url)
+    origin = f"{parsed_entry.scheme}://{parsed_entry.netloc}"
 
     with Progress(
         SpinnerColumn(),
@@ -144,35 +151,78 @@ async def run_audit_command(url: str, json_output: bool = False, html_output: st
         console=console,
         transient=True
     ) as progress:
-        task1 = progress.add_task(f"Navigating to {url} and capturing DOM/Visuals...", total=None)
-        nav_data = await navigator.inspect_url(url, capture_screenshot=True)
+        while queue and len(visited_urls) < (max_pages if crawl else 1):
+            current_url = queue.pop(0)
+            if current_url in visited_urls:
+                continue
+            visited_urls.add(current_url)
 
-        progress.update(task1, description="Running 4-Pillar AEO & Meta AI visual analysis...")
-        audit_result = await scorer.audit(
-            url=nav_data.final_url,
-            html=nav_data.html,
-            text_content=nav_data.text_content,
-            raw_html_tokens=nav_data.raw_html_tokens,
-            text_tokens=nav_data.text_tokens,
-            traps=nav_data.traps,
-            interactive_marks=nav_data.interactive_marks,
-            a11y_tree=nav_data.a11y_tree,
-            screenshot_b64=nav_data.screenshot_base64
-        )
+            task1 = progress.add_task(f"Navigating to {current_url}...", total=None)
+            nav_data = await navigator.inspect_url(current_url, capture_screenshot=True)
+
+            progress.update(task1, description=f"Auditing AEO for {current_url}...")
+            audit_result = await scorer.audit(
+                url=nav_data.final_url,
+                html=nav_data.html,
+                text_content=nav_data.text_content,
+                raw_html_tokens=nav_data.raw_html_tokens,
+                text_tokens=nav_data.text_tokens,
+                traps=nav_data.traps,
+                interactive_marks=nav_data.interactive_marks,
+                a11y_tree=nav_data.a11y_tree,
+                screenshot_b64=nav_data.screenshot_base64
+            )
+            crawled_results.append((audit_result, nav_data))
+
+            # If crawling, discover internal links
+            if crawl:
+                for m in nav_data.interactive_marks:
+                    href = m.get("href")
+                    if href and not href.startswith("#") and not href.startswith("mailto:"):
+                        full_url = urljoin(current_url, href)
+                        if urlparse(full_url).netloc == parsed_entry.netloc and full_url not in visited_urls:
+                            queue.append(full_url)
+
+    # Use first result for primary display / HTML report
+    primary_audit, primary_nav = crawled_results[0]
 
     if html_output:
-        save_html_report(audit_result, nav_data, html_output)
+        save_html_report(primary_audit, primary_nav, html_output)
         console.print(f"[bold green]✨ Interactive HTML report saved to {html_output}[/bold green]\n")
 
     if json_output:
-        print(json.dumps(audit_result.model_dump(), indent=2))
+        print(json.dumps([r[0].model_dump() for r in crawled_results], indent=2))
         return
 
-    # Print Rich Score Card
-    color = "green" if audit_result.overall_score >= 80 else ("yellow" if audit_result.overall_score >= 60 else "red")
-    console.print(f"\n[bold]Target URL:[/bold] [underline]{audit_result.url}[/underline]")
-    console.print(f"[bold]AEO & Agent Score:[/bold] [{color}]{audit_result.overall_score} / 100 [bold]({audit_result.grade})[/bold][/{color}]")
-    console.print(f"[dim]{audit_result.status}[/dim]\n")
+    # If crawl mode was used and multiple pages audited, show Sitewide Table
+    if len(crawled_results) > 1:
+        avg_score = round(sum(r[0].overall_score for r in crawled_results) / len(crawled_results), 1)
+        console.print(f"\n[bold cyan]🌐 Sitewide Crawl Summary ({len(crawled_results)} pages audited):[/bold cyan]")
+        console.print(f"[bold]Average Domain AEO Score:[/bold] [bold green]{avg_score} / 100[/bold green]\n")
+
+        crawl_table = Table(title="Page-by-Page AEO Breakdown", border_style="cyan")
+        crawl_table.add_column("Page URL", style="underline")
+        crawl_table.add_column("Score", justify="center")
+        crawl_table.add_column("Grade", justify="center")
+        crawl_table.add_column("Key Blocker", style="dim")
+
+        for aud, _ in crawled_results:
+            first_blocker = aud.critical_blockers[0] if aud.critical_blockers else "None (Clean)"
+            color_grade = "green" if aud.overall_score >= 80 else ("yellow" if aud.overall_score >= 60 else "red")
+            crawl_table.add_row(
+                aud.url,
+                f"[{color_grade}]{aud.overall_score}[/{color_grade}]",
+                f"[{color_grade}]{aud.grade}[/{color_grade}]",
+                first_blocker[:45] + ("..." if len(first_blocker) > 45 else "")
+            )
+        console.print(crawl_table)
+        console.print("")
+
+    # Print Primary Rich Score Card
+    color = "green" if primary_audit.overall_score >= 80 else ("yellow" if primary_audit.overall_score >= 60 else "red")
+    console.print(f"\n[bold]Target URL:[/bold] [underline]{primary_audit.url}[/underline]")
+    console.print(f"[bold]AEO & Agent Score:[/bold] [{color}]{primary_audit.overall_score} / 100 [bold]({primary_audit.grade})[/bold][/{color}]")
+    console.print(f"[dim]{primary_audit.status}[/dim]\n")
 
     # Table of 4 Pillars
     table = Table(title="📊 The 4-Pillar AEO Breakdown", border_style="dim")
@@ -300,6 +350,8 @@ def main():
     audit_parser.add_argument("url", help="Target website URL to inspect")
     audit_parser.add_argument("--json", action="store_true", help="Output pure JSON")
     audit_parser.add_argument("--html", default=None, help="Save interactive HTML report to file")
+    audit_parser.add_argument("--crawl", action="store_true", help="Enable multi-page crawl of internal links")
+    audit_parser.add_argument("--max-pages", type=int, default=3, help="Maximum pages to crawl (default: 3)")
 
     # spec subcommand
     spec_parser = subparsers.add_parser("spec", help="Generate agent-spec.json and llms.txt")
@@ -319,7 +371,13 @@ def main():
     args = parser.parse_args()
 
     if args.command == "audit":
-        asyncio.run(run_audit_command(args.url, json_output=args.json, html_output=args.html))
+        asyncio.run(run_audit_command(
+            args.url,
+            json_output=args.json,
+            html_output=args.html,
+            crawl=args.crawl,
+            max_pages=args.max_pages
+        ))
     elif args.command == "spec":
         asyncio.run(run_spec_command(args.url, out_dir=args.out_dir))
     elif args.command == "patch":
