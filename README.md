@@ -221,18 +221,36 @@ uv pip install -e .
 playwright install chromium
 ```
 
-### 2. Environment Setup
+### 2. Environment Setup (Tri-Mode Inference)
 
-```bash
-cp .env.example .env
-# Edit .env and supply your META_MODEL_API_KEY
-```
+AEOForge is built to run anywhere — locally or via cloud APIs:
+
+* **Mode A: 100% Local On-Device (Zero API Keys)**
+  ```bash
+  # Pull Meta's vision model locally via Ollama
+  ollama run llama3.2-vision
+  # AEOForge auto-detects Ollama at http://localhost:11434 and runs 100% privately on your machine!
+  ```
+
+* **Mode B: Cloud Meta Model API ($150 Hackathon Credits)**
+  ```bash
+  cp .env.example .env
+  # Set your META_MODEL_API_KEY in .env
+  ```
+
+* **Mode C: Zero-Config Local Heuristics**
+  ```bash
+  # No API keys or Ollama needed! Built-in deterministic DOM/a11y engine runs immediately.
+  ```
 
 ### 3. Run Your First AEO Audit via CLI
 
 ```bash
-# Run a full visual + AEO audit on any URL
-aeoforge audit https://example.com
+# Run a full visual + AEO audit on any URL (with interactive HTML dashboard)
+aeoforge audit https://example.com --html report.html
+
+# Run a multi-page crawl of internal links with sitewide score
+aeoforge audit https://example.com --crawl --max-pages 5
 
 # Generate machine-readable agent-spec.json and llms.txt
 aeoforge spec https://example.com --out-dir ./output

@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     meta_model_name: str = "meta/llama-3.2-11b-vision-instruct"
     meta_model_api_base: str = "https://api.meta.ai/v1"
 
+    # Local Ollama Configuration (100% On-Device Meta Llama 3.2 Vision)
+    ollama_endpoint: str = "http://localhost:11434"
+    ollama_model_name: str = "llama3.2-vision"
+    use_ollama: bool = True
+
     # Local Llama Stack Endpoint
     llama_stack_endpoint: str = "http://localhost:5001"
     use_local_llama: bool = False
