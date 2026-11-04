@@ -168,15 +168,6 @@ Navigate to `http://localhost:8000` to access the interactive audit studio:
 - **Progression Drawer (Cmd+H)**: Historical audit records and domain score evolution curves stored in persistent SQLite.
 - **Dual Visual Themes**: Obsidian Dark & Porcelain Light modes built for high-contrast accessibility.
 
-<details>
-<summary><b>View Porcelain (Light Mode) Studio Preview</b></summary>
-<br />
-
-<p align="center">
-  <img src="assets/aeoforge-studio-light.png" alt="AEOForge Porcelain Light Theme" width="100%" />
-</p>
-</details>
-
 ### 2. Command Line Interface (CLI)
 
 Run audits, crawls, spec generations, and codebase patches directly from the terminal:
