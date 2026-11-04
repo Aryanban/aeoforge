@@ -118,6 +118,197 @@ function toggleDrawer(drawerId) {
   }
 }
 
+// Robust Tools Dropdown Menu (Click-to-Toggle with Click-Outside Dismissal)
+function toggleToolsDropdown(event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  const menu = document.getElementById("toolsDropdownMenu");
+  const btn = document.getElementById("toolsDropdownBtn");
+  const chevron = document.getElementById("toolsChevron");
+  if (!menu) return;
+  const isClosed = menu.classList.contains("hidden");
+  if (isClosed) {
+    menu.classList.remove("hidden");
+    if (btn) btn.setAttribute("aria-expanded", "true");
+    if (chevron) chevron.style.transform = "rotate(180deg)";
+  } else {
+    menu.classList.add("hidden");
+    if (btn) btn.setAttribute("aria-expanded", "false");
+    if (chevron) chevron.style.transform = "rotate(0deg)";
+  }
+}
+
+function closeToolsDropdown() {
+  const menu = document.getElementById("toolsDropdownMenu");
+  const btn = document.getElementById("toolsDropdownBtn");
+  const chevron = document.getElementById("toolsChevron");
+  if (menu && !menu.classList.contains("hidden")) {
+    menu.classList.add("hidden");
+    if (btn) btn.setAttribute("aria-expanded", "false");
+    if (chevron) chevron.style.transform = "rotate(0deg)";
+  }
+}
+
+// Global click-outside listener to close Tools dropdown
+document.addEventListener("click", (e) => {
+  const wrapper = document.getElementById("toolsDropdownWrapper");
+  if (wrapper && !wrapper.contains(e.target)) {
+    closeToolsDropdown();
+  }
+});
+
+// --- Multi-Page Perception Session State & History Navigation ---
+let sessionPages = []; // List of all pages audited or crawled in this session
+let currentSessionPageIndex = 0;
+
+function recordSessionAuditPage(auditData) {
+  if (!auditData || !auditData.url) return;
+  const pageObj = {
+    url: auditData.url,
+    title: auditData.title || auditData.url,
+    overall_score: auditData.overall_score,
+    grade: auditData.grade,
+    screenshot_base64: auditData.screenshot_base64,
+    interactive_marks: auditData.interactive_marks || [],
+    traps: auditData.traps || [],
+    visual_analysis: auditData.visual_analysis,
+    deductions: auditData.deductions || [],
+    key_strengths: auditData.key_strengths || [],
+    critical_blockers: auditData.critical_blockers || [],
+    full_audit: auditData
+  };
+
+  const existingIdx = sessionPages.findIndex(p => p.url === auditData.url);
+  if (existingIdx !== -1) {
+    sessionPages[existingIdx] = pageObj;
+    currentSessionPageIndex = existingIdx;
+  } else {
+    sessionPages.push(pageObj);
+    currentSessionPageIndex = sessionPages.length - 1;
+  }
+  syncPerceptionPagesList();
+}
+
+function syncPerceptionPagesList() {
+  window.sessionPages = sessionPages;
+  window.currentSessionPageIndex = currentSessionPageIndex;
+  const select = document.getElementById("viewportRouteSelect");
+  const counter = document.getElementById("viewportPageCounter");
+  const prevBtn = document.getElementById("viewportPrevBtn");
+  const nextBtn = document.getElementById("viewportNextBtn");
+  const input = document.getElementById("viewportUrlInput");
+  const pill = document.getElementById("viewportUrlPill");
+
+  if (!select) return;
+  select.innerHTML = "";
+
+  if (sessionPages.length === 0) {
+    const defaultUrl = input ? input.value : "https://docs.python.org";
+    const opt = document.createElement("option");
+    opt.value = defaultUrl;
+    opt.textContent = `${defaultUrl} (1/1)`;
+    select.appendChild(opt);
+    if (counter) counter.textContent = "1/1";
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
+    return;
+  }
+
+  if (currentSessionPageIndex < 0) currentSessionPageIndex = 0;
+  if (currentSessionPageIndex >= sessionPages.length) currentSessionPageIndex = sessionPages.length - 1;
+
+  sessionPages.forEach((p, idx) => {
+    const opt = document.createElement("option");
+    opt.value = p.url;
+    const scoreText = (p.overall_score !== undefined) ? ` [${p.overall_score.toFixed(1)} pts]` : "";
+    opt.textContent = `${idx + 1}. ${p.url}${scoreText}`;
+    if (idx === currentSessionPageIndex) opt.selected = true;
+    select.appendChild(opt);
+  });
+
+  const cur = sessionPages[currentSessionPageIndex];
+  if (cur) {
+    if (input) input.value = cur.url;
+    if (pill) pill.textContent = cur.url;
+  }
+
+  if (counter) {
+    counter.textContent = `${currentSessionPageIndex + 1}/${sessionPages.length}`;
+  }
+
+  if (prevBtn) prevBtn.disabled = (currentSessionPageIndex <= 0);
+  if (nextBtn) nextBtn.disabled = (currentSessionPageIndex >= sessionPages.length - 1);
+}
+
+function navigatePerceptionHistory(delta) {
+  if (sessionPages.length === 0) return;
+  const newIndex = currentSessionPageIndex + delta;
+  if (newIndex >= 0 && newIndex < sessionPages.length) {
+    loadSessionPageAtIndex(newIndex);
+  }
+}
+
+function loadSessionPageAtIndex(index) {
+  if (index < 0 || index >= sessionPages.length) return;
+  currentSessionPageIndex = index;
+  const page = sessionPages[index];
+  if (page.full_audit) {
+    currentAuditResult = page.full_audit;
+    currentSpecResult = page.full_audit;
+    renderAuditResults(page.full_audit);
+  } else {
+    renderAuditResults(page);
+  }
+  syncPerceptionPagesList();
+}
+
+function onViewportRouteSelected(url) {
+  const foundIdx = sessionPages.findIndex(p => p.url === url);
+  if (foundIdx !== -1) {
+    loadSessionPageAtIndex(foundIdx);
+  } else {
+    inspectViewportUrl(url);
+  }
+}
+
+function handleViewportUrlKeyDown(event) {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    inspectViewportUrl();
+  }
+}
+
+async function inspectViewportUrl(customUrl) {
+  const input = document.getElementById("viewportUrlInput");
+  const targetUrl = (customUrl || (input ? input.value : "")).trim();
+  if (!targetUrl) return;
+
+  const foundIdx = sessionPages.findIndex(p => p.url === targetUrl);
+  if (foundIdx !== -1 && sessionPages[foundIdx].screenshot_base64) {
+    loadSessionPageAtIndex(foundIdx);
+    return;
+  }
+
+  const mainInput = document.getElementById("targetUrlInput") || document.getElementById("urlInput");
+  if (mainInput) mainInput.value = targetUrl;
+  showToast(`Navigating perception browser to ${targetUrl}...`);
+  await runAudit(targetUrl);
+}
+
+function triggerRoutePicker() {
+  const sel = document.getElementById("viewportRouteSelect");
+  if (!sel) return;
+  if (typeof sel.showPicker === "function") {
+    try {
+      sel.showPicker();
+      return;
+    } catch (_) {}
+  }
+  sel.focus();
+}
+
 // Quick Preset Benchmark Loader
 function loadPreset(domain) {
   const input = document.getElementById("targetUrlInput");
@@ -254,6 +445,7 @@ async function handleAuditSubmit(event) {
     const data = await res.json();
     currentAuditResult = data;
     currentSpecResult = data; // In-memory specs synthesized at 0ms latency
+    recordSessionAuditPage(data);
     renderAuditResults(data);
     resultsDiv?.classList.remove("opacity-50");
     showToast("Audit completed successfully");
@@ -370,6 +562,8 @@ function renderAuditResults(result) {
   const shotImg = document.getElementById("screenshotImg");
   const viewportPill = document.getElementById("viewportUrlPill");
   if (viewportPill) viewportPill.textContent = result.url;
+  const viewportInput = document.getElementById("viewportUrlInput");
+  if (viewportInput) viewportInput.value = result.url;
 
   const b64 = result.screenshot_base64 || result.som_screenshot_b64;
   if (b64) {
@@ -1307,13 +1501,7 @@ function setTheme(theme, persist = true) {
 }
 
 function applyTheme(theme) {
-  let isDark = true;
-  if (theme === "system") {
-    isDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-  } else {
-    isDark = (theme === "dark");
-  }
-
+  const isDark = (theme !== "light");
   const html = document.documentElement;
   if (isDark) {
     html.classList.add("dark");
@@ -1324,10 +1512,10 @@ function applyTheme(theme) {
   }
 
   // Update theme switcher buttons in header
-  ["dark", "light", "system"].forEach(t => {
+  ["dark", "light"].forEach(t => {
     const btn = document.getElementById(`themeBtn-${t}`);
     if (btn) {
-      if (t === theme) {
+      if ((isDark && t === "dark") || (!isDark && t === "light")) {
         btn.classList.add("segment-tab-active");
         btn.classList.remove("segment-tab-inactive");
         btn.setAttribute("aria-checked", "true");
@@ -1890,6 +2078,24 @@ async function handleBatchAuditSubmit(event) {
     if (card) {
       card.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
+    if (data.pages && data.pages.length > 0) {
+      sessionPages = data.pages.map(p => ({
+        url: p.url,
+        title: p.title,
+        overall_score: p.overall_score,
+        grade: p.grade,
+        screenshot_base64: p.screenshot_base64 || (p.full_audit && p.full_audit.screenshot_base64),
+        interactive_marks: p.interactive_marks || (p.full_audit && p.full_audit.interactive_marks),
+        traps: p.traps,
+        visual_analysis: p.visual_analysis || (p.full_audit && p.full_audit.visual_analysis),
+        deductions: p.deductions || (p.full_audit && p.full_audit.deductions),
+        key_strengths: p.key_strengths || (p.full_audit && p.full_audit.key_strengths),
+        critical_blockers: p.critical_blockers || (p.full_audit && p.full_audit.critical_blockers),
+        full_audit: p.full_audit
+      }));
+      currentSessionPageIndex = 0;
+      syncPerceptionPagesList();
+    }
     showToast(`Scored ${data.pages_audited} custom URLs successfully`);
   } catch (e) {
     showToast(`Batch audit error: ${e.message}`);
@@ -1903,11 +2109,13 @@ async function handleBatchAuditSubmit(event) {
 function loadBatchResultIntoStudio(index) {
   const list = currentBatchData ? (currentBatchData.pages || currentBatchData.results || []) : [];
   if (!list[index]) return;
+  currentSessionPageIndex = index;
   const page = list[index];
   if (page.full_audit) {
     currentAuditResult = page.full_audit;
     currentSpecResult = page.full_audit;
     renderAuditResults(page.full_audit);
+    syncPerceptionPagesList();
     showToast(`Loaded ${page.url} into studio`);
     const resultsDiv = document.getElementById("results");
     if (resultsDiv) resultsDiv.classList.remove("hidden");
@@ -2357,6 +2565,24 @@ async function handleInlineCrawlSubmit() {
 
 function renderCrawlReport(data) {
   currentCrawlData = data;
+  if (data.pages && data.pages.length > 0) {
+    sessionPages = data.pages.map(p => ({
+      url: p.url,
+      title: p.title,
+      overall_score: p.overall_score,
+      grade: p.grade,
+      screenshot_base64: p.screenshot_base64 || (p.full_audit && p.full_audit.screenshot_base64),
+      interactive_marks: p.interactive_marks || (p.full_audit && p.full_audit.interactive_marks),
+      traps: p.traps,
+      visual_analysis: p.visual_analysis || (p.full_audit && p.full_audit.visual_analysis),
+      deductions: p.deductions || (p.full_audit && p.full_audit.deductions),
+      key_strengths: p.key_strengths || (p.full_audit && p.full_audit.key_strengths),
+      critical_blockers: p.critical_blockers || (p.full_audit && p.full_audit.critical_blockers),
+      full_audit: p.full_audit
+    }));
+    currentSessionPageIndex = 0;
+    syncPerceptionPagesList();
+  }
   const card = document.getElementById("crawlResultsCard");
   const summaryStats = document.getElementById("crawlSummaryStats");
   const sitewideScore = document.getElementById("crawlSitewideScore");
@@ -2527,16 +2753,28 @@ function renderCrawlReport(data) {
 
 function loadCrawlResultIntoStudio(index) {
   if (!currentCrawlData || !currentCrawlData.pages || !currentCrawlData.pages[index]) return;
+  currentSessionPageIndex = index;
   const page = currentCrawlData.pages[index];
   if (page.full_audit) {
     currentAuditResult = page.full_audit;
     currentSpecResult = page.full_audit;
     renderAuditResults(page.full_audit);
+    syncPerceptionPagesList();
     showToast(`Loaded ${page.url} into studio`);
     const display = document.getElementById("scoreDisplay");
     if (display) display.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 }
+
+window.toggleToolsDropdown = toggleToolsDropdown;
+window.closeToolsDropdown = closeToolsDropdown;
+window.navigatePerceptionHistory = navigatePerceptionHistory;
+window.onViewportRouteSelected = onViewportRouteSelected;
+window.handleViewportUrlKeyDown = handleViewportUrlKeyDown;
+window.inspectViewportUrl = inspectViewportUrl;
+window.triggerRoutePicker = triggerRoutePicker;
+window.syncPerceptionPagesList = syncPerceptionPagesList;
+window.loadSessionPageAtIndex = loadSessionPageAtIndex;
 
 window.setInlineBudget = setInlineBudget;
 window.handleInlineCrawlSubmit = handleInlineCrawlSubmit;

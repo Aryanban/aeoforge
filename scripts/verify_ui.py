@@ -116,7 +116,7 @@ async def verify_ui():
         await page.keyboard.press("Escape")
         await page.wait_for_selector("#compareDrawer", state="hidden")
 
-        # 7. Test Theme Switcher (Dark -> Light -> System -> Dark)
+        # 7. Test Theme Switcher (Dark -> Light -> Dark)
         print("7. Testing Theme Switcher...")
         await page.click("#themeBtn-light")
         await page.wait_for_timeout(200)
@@ -130,14 +130,18 @@ async def verify_ui():
         assert is_dark, "Dark theme should add .dark class and set data-theme='dark'"
         print("✓ Switched back to Dark Theme successfully")
 
-        await page.click("#themeBtn-system")
-        await page.wait_for_timeout(200)
-        system_stored = await page.evaluate("() => localStorage.getItem('aeoforge-theme') === 'system'")
-        assert system_stored, "System theme preference should be stored in localStorage"
-        print("✓ System Theme preference set successfully")
-
-        # Switch back to dark for standard look
-        await page.click("#themeBtn-dark")
+        # 7b. Test Tools Dropdown Click Toggle
+        print("7b. Testing Tools Dropdown Toggle...")
+        await page.click("#toolsDropdownBtn")
+        await page.wait_for_timeout(150)
+        menu_open = await page.evaluate("() => !document.getElementById('toolsDropdownMenu').classList.contains('hidden')")
+        assert menu_open, "Tools dropdown menu should be visible after click"
+        # Click outside to close
+        await page.click("body", position={"x": 10, "y": 10})
+        await page.wait_for_timeout(150)
+        menu_closed = await page.evaluate("() => document.getElementById('toolsDropdownMenu').classList.contains('hidden')")
+        assert menu_closed, "Tools dropdown menu should close after clicking outside"
+        print("✓ Tools dropdown click-toggle verified")
 
         # 8. Test Accessibility (WCAG 2.1 AA Skip Link & Reduced Motion)
         print("8. Testing Accessibility Features...")

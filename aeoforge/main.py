@@ -379,7 +379,9 @@ async def crawl_endpoint(request: CrawlRequest):
             step += 1
 
             try:
-                nav_data = await navigator.inspect_url(current_url, capture_screenshot=False)
+                # Capture screenshot for entry page or small budget crawls for instant perception rendering
+                capture_ss = (step == 0) or (budget <= 5)
+                nav_data = await navigator.inspect_url(current_url, capture_screenshot=capture_ss)
 
                 # Check if navigation encountered a hard failure or block
                 if nav_data.navigation_error or getattr(nav_data, "http_status", 200) >= 400:
@@ -405,7 +407,8 @@ async def crawl_endpoint(request: CrawlRequest):
                     text_tokens=nav_data.text_tokens,
                     traps=nav_data.traps,
                     interactive_marks=nav_data.interactive_marks,
-                    a11y_tree=nav_data.a11y_tree
+                    a11y_tree=nav_data.a11y_tree,
+                    screenshot_b64=nav_data.screenshot_base64
                 )
                 audit.title = nav_data.title
                 p = audit.pillars
@@ -424,6 +427,13 @@ async def crawl_endpoint(request: CrawlRequest):
                     "token_ratio": nav_data.token_ratio,
                     "traps_count": len(nav_data.traps),
                     "top_deduction": f"-{audit.deductions[0]['points_lost']} pts: {audit.deductions[0]['title']}" if (audit.deductions and len(audit.deductions) > 0) else "None",
+                    "screenshot_base64": nav_data.screenshot_base64,
+                    "interactive_marks": nav_data.interactive_marks,
+                    "traps": nav_data.traps,
+                    "visual_analysis": audit.visual_analysis,
+                    "deductions": audit.deductions,
+                    "key_strengths": audit.key_strengths,
+                    "critical_blockers": audit.critical_blockers,
                     "full_audit": audit.model_dump()
                 })
 
