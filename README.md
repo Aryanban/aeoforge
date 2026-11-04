@@ -11,6 +11,15 @@ The open-source Answer Engine Optimization (AEO) and agent-readiness platform. B
 
 ---
 
+<p align="center">
+  <img src="assets/aeoforge-studio-preview.png" alt="AEOForge Studio Dashboard • Visual Agent Perception & 4-Pillar Score Matrix" width="100%" />
+</p>
+<p align="center">
+  <em>AEOForge Real-Time Studio: 4-Pillar AEO Scoring Matrix, Visual Coordinate Grounding (OmniParser v2 / Set-of-Marks), and Meta Llama 3.2 Navigation Plan</em>
+</p>
+
+---
+
 ## Overview
 
 Traditional web pages are engineered for human eyeballs: heavy DOM trees (50,000+ tokens per page), complex SPAs, modal overlays, unlabelled interactive buttons, and missing metadata. 
@@ -157,6 +166,16 @@ Navigate to `http://localhost:8000` to access the interactive audit studio:
 - **Competitor Lab**: Direct side-by-side URL comparison to benchmark AEO readiness against rival domains.
 - **In-UI AST Codebase Patcher**: Click "Apply Fix to Codebase" to automatically write `llms.txt` and inject Schema.org JSON-LD into your project.
 - **Progression Drawer (Cmd+H)**: Historical audit records and domain score evolution curves stored in persistent SQLite.
+- **Dual Visual Themes**: Obsidian Dark & Porcelain Light modes built for high-contrast accessibility.
+
+<details>
+<summary><b>View Porcelain (Light Mode) Studio Preview</b></summary>
+<br />
+
+<p align="center">
+  <img src="assets/aeoforge-studio-light.png" alt="AEOForge Porcelain Light Theme" width="100%" />
+</p>
+</details>
 
 ### 2. Command Line Interface (CLI)
 

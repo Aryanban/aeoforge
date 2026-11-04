@@ -64,6 +64,7 @@ blob-report/
 playwright/.cache/
 screenshots/
 *.png
+!assets/*.png
 
 # IDEs & OS
 .DS_Store
