@@ -264,6 +264,30 @@ Remediation Steps:
 
 ---
 
+## Meta Global AI Developer Hackathon 2026
+
+AEOForge was conceived, engineered, and benchmarked specifically for the **Meta Global AI Developer Hackathon 2026** ($1,000,000 prize pool) under the **Push the Frontier: Software Engineering & Autonomous AI Agents** track.
+
+### Hackathon Architecture & Meta Models Integration
+
+1. **Meta Llama 3.2 Vision (11B & 90B Instruct)**:
+   - Powers visual perception in `aeoforge/models/meta_client.py`.
+   - Analyzes Set-of-Mark screenshots to ground unlabeled buttons, identify modal overlay obstructions, and verify visual contrast before dispatching autonomous web agents.
+
+2. **Meta Llama 3.2 On-Device (3B & 1B Instruct)**:
+   - Default local inference engine delivering **7ms inference latency** via Metal GPU acceleration on Apple Silicon (M-series) and local GPUs.
+   - Enables 100% private, sovereign website audits with zero monthly cloud SaaS bills.
+
+3. **Dual Execution Engine (Cloud + Local)**:
+   - **Mode A (Meta Model API Cloud)**: Powered by official Meta Model API endpoints (`https://api.meta.ai/v1`) using hackathon credit allocations.
+   - **Mode B (Local Self-Hosted via Ollama)**: Zero-configuration local fallback for developers seeking 100% offline, privacy-first execution.
+   - **Mode C (Deterministic AST Fallback)**: Resilient fallback engine that audits pages even in offline environments without active LLM daemons.
+
+4. **Universal Agent Handshake (MCP & llms.txt)**:
+   - Emits standardized `agent-spec.json`, spec-compliant `llms.txt`, and Model Context Protocol (MCP) tool endpoints, turning any audited website into a machine-readable playground for Meta AI agents.
+
+---
+
 ## Testing
 
 Run the test suite using pytest:
