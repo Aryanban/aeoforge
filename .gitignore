@@ -80,6 +80,9 @@ screenshots/
 *.pdf
 *.html
 output_test/
+data/
+agent-spec.json
+llms.txt
 
 # Local planning & blueprint documents (keep local only)
 reference.md
