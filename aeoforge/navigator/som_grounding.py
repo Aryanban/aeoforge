@@ -5,17 +5,34 @@ Inspired by browser-use (https://github.com/browser-use/browser-use) and Microso
 from typing import Dict, Any, List, Tuple
 
 
-# Injected JavaScript that identifies interactive elements, computes sub-pixel center click targets,
-# and returns a pruned, deduplicated interactive tree.
+# Injected JavaScript that recursively pierces Shadow DOM, identifies interactive elements,
+# computes sub-pixel center click targets, and returns a pruned, deduplicated interactive tree.
 SOM_EXTRACTION_SCRIPT = """
 () => {
     const interactiveTags = new Set(['a', 'button', 'input', 'select', 'textarea', 'details', 'summary']);
     const interactiveRoles = new Set(['button', 'link', 'checkbox', 'radio', 'combobox', 'tab', 'menuitem', 'searchbox']);
     
-    // Query focused interactive candidates directly instead of querying entire DOM tree
-    const candidates = document.querySelectorAll(
-        'a, button, input, select, textarea, details, summary, [role], [onclick], [tabindex]:not([tabindex="-1"]), [contenteditable="true"]'
-    );
+    const candidates = [];
+    const directSelector = 'a, button, input, select, textarea, details, summary, [role], [onclick], [tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
+
+    // Deep piercing shadow DOM candidate collector
+    function collectFromRoot(root) {
+        if (!root) return;
+        try {
+            const els = root.querySelectorAll(directSelector);
+            for (let i = 0; i < els.length; i++) candidates.push(els[i]);
+            
+            // Search for shadow DOM hosts recursively
+            const allHosts = root.querySelectorAll('*');
+            for (let i = 0; i < allHosts.length; i++) {
+                if (allHosts[i].shadowRoot) {
+                    collectFromRoot(allHosts[i].shadowRoot);
+                }
+            }
+        } catch (e) {}
+    }
+    collectFromRoot(document);
+
     const marks = [];
     const seenElements = new Set();
     let markId = 1;
@@ -162,7 +179,7 @@ SOM_REMOVE_BADGES_SCRIPT = """
 
 
 async def extract_interactive_marks(page) -> List[Dict[str, Any]]:
-    """Extract interactive element bounding boxes, click centroids, and labels."""
+    """Extract interactive element bounding boxes, click centroids, and labels with shadow DOM piercing."""
     try:
         marks = await page.evaluate(SOM_EXTRACTION_SCRIPT)
         return marks

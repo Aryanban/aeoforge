@@ -4,6 +4,7 @@ Integrates route interception, Set-of-Mark grounding, and navigation trap detect
 
 import base64
 import os
+import platform
 import re
 from typing import Dict, Any, Optional
 from bs4 import BeautifulSoup
@@ -19,6 +20,43 @@ from aeoforge.navigator.som_grounding import (
     build_a11y_tree_representation,
 )
 from aeoforge.utils.deobfuscator import extract_obfuscated_emails
+
+# Cross-platform environment resolution (macOS, Linux, Windows)
+HOST_OS = platform.system()
+if HOST_OS == "Linux":
+    DEFAULT_UA_PLATFORM = '"Linux"'
+    DEFAULT_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+elif HOST_OS == "Windows":
+    DEFAULT_UA_PLATFORM = '"Windows"'
+    DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+else:
+    DEFAULT_UA_PLATFORM = '"macOS"'
+    DEFAULT_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+
+# Ultra-hardened, low-latency Chromium launch arguments across Mac, Windows, and Linux
+CROSS_PLATFORM_CHROMIUM_ARGS = [
+    "--disable-blink-features=AutomationControlled",
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-infobars",
+    "--window-size=1280,800",
+    "--disable-dev-shm-usage",  # Crucial for Linux & Docker containers to eliminate /dev/shm OOM crashes
+    "--disable-gpu",            # Essential for headless Linux/Windows WSL environments
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--disable-background-networking",
+    "--disable-background-timer-throttling",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-breakpad",
+    "--disable-component-extensions-with-background-pages",
+    "--disable-extensions",
+    "--disable-features=Translate,BackForwardCache,AcceptCHFrame,MediaRouter,OptimizationHints",
+    "--disable-ipc-flooding-protection",
+    "--disable-renderer-backgrounding",
+    "--force-color-profile=srgb",
+    "--metrics-recording-only",
+    "--mute-audio",
+]
 
 
 class NavigatedPageData(BaseModel):
@@ -52,23 +90,17 @@ class BrowserNavigator:
         async with async_playwright() as p:
             browser = await p.chromium.launch(
                 headless=self.headless,
-                args=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-infobars",
-                    "--window-size=1280,800",
-                ]
+                args=CROSS_PLATFORM_CHROMIUM_ARGS
             )
             context = await browser.new_context(
                 viewport={"width": 1280, "height": 800},
-                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+                user_agent=DEFAULT_USER_AGENT,
                 locale="en-US",
                 extra_http_headers={
                     "Accept-Language": "en-US,en;q=0.9",
                     "Sec-Ch-Ua": '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
                     "Sec-Ch-Ua-Mobile": "?0",
-                    "Sec-Ch-Ua-Platform": '"macOS"',
+                    "Sec-Ch-Ua-Platform": DEFAULT_UA_PLATFORM,
                     "Sec-Fetch-Dest": "document",
                     "Sec-Fetch-Mode": "navigate",
                     "Sec-Fetch-Site": "none",

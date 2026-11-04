@@ -8,7 +8,6 @@ from bs4 import BeautifulSoup, Tag
 
 def extract_distilled_markdown(soup: BeautifulSoup) -> str:
     """Extract a high-density, token-pruned semantic markdown digest for LLM agents."""
-    # Find primary content container or fallback to body
     container = soup.find("main") or soup.find("article") or soup.find(attrs={"role": "main"}) or soup.body
     if not container:
         return ""
@@ -19,7 +18,7 @@ def extract_distilled_markdown(soup: BeautifulSoup) -> str:
         noisy_tag.decompose()
 
     markdown_lines = []
-    for el in clone.find_all(["h1", "h2", "h3", "h4", "p", "li"]):
+    for el in clone.find_all(["h1", "h2", "h3", "p", "li"]):
         txt = el.get_text(separator=" ", strip=True)
         if not txt or len(txt) < 3:
             continue
@@ -34,9 +33,9 @@ def extract_distilled_markdown(soup: BeautifulSoup) -> str:
         else:
             markdown_lines.append(txt)
 
-    # Return concise digest (capped to prevent token blowup)
-    digest = "\n\n".join(markdown_lines[:25])
-    return digest[:2000]
+    # Concise digest capped at ~1,200 chars to maximize token compression (< 300 tokens)
+    digest = "\n\n".join(markdown_lines[:15])
+    return digest[:1200]
 
 
 def generate_agent_spec(
@@ -87,7 +86,7 @@ def generate_agent_spec(
 
     # Curate high-value navigation targets from interactive marks
     high_value_actions = {}
-    for m in interactive_marks[:25]:
+    for m in interactive_marks[:20]:
         name_lower = (m.get("name") or "").lower()
         target_val = m.get("href") or f"[{m['id']}]"
         if "pricing" in name_lower and "pricing" not in high_value_actions:
@@ -103,7 +102,7 @@ def generate_agent_spec(
     raw_tokens = max(1, len(html) // 4)
     distilled_md = extract_distilled_markdown(soup)
     distilled_tokens = max(1, len(distilled_md) // 4)
-    estimated_clean_tokens = min(raw_tokens, max(150, distilled_tokens))
+    estimated_clean_tokens = min(raw_tokens, max(120, distilled_tokens))
     savings_pct = round(((raw_tokens - estimated_clean_tokens) / raw_tokens) * 100, 1)
 
     # Synthesize WebMCP standard tools
