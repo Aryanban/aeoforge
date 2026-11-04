@@ -1,0 +1,42 @@
+name: Bug Report
+description: Report a reproducible bug or unexpected behavior in AEOForge
+title: "fix: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue in AEOForge! Please fill out the details below to help us diagnose and fix it quickly.
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: When running an audit against...
+    validations:
+      required: true
+  - type: input
+    id: target-url
+    attributes:
+      label: Target URL or Reproduction Step
+      description: The URL or command that triggered the error.
+      placeholder: "aeoforge audit https://example.com"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Terminal Logs / Traceback
+      description: Paste any error outputs or stack traces.
+      render: shell
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - macOS
+        - Linux (Ubuntu/Debian)
+        - Windows
+        - Docker
+    validations:
+      required: true
