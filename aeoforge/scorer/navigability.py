@@ -77,6 +77,58 @@ def score_navigability(
         for t in traps:
             feedback.append(f"Blocker detected: {t['name']} ({t['severity']}). Causes agent navigation loops.")
 
+    deductions = []
+
+    if token_ratio < 0.15:
+        lost = 6.0 if token_ratio < 0.05 else 3.0
+        deductions.append({
+            "points_lost": lost,
+            "category": "Token Bloat",
+            "title": "DOM Hydration Bloat & Low Content Ratio",
+            "reason": f"Text-to-DOM ratio is only {round(token_ratio * 100, 2)}% ({raw_html_tokens} raw HTML tokens vs {text_tokens} text tokens). Excessive script/SVG bloat exhausts agent LLM context.",
+            "recommendation": "Prune inline SVG tags, defer JSON-SSR hydration states, and serve distilled semantic markdown."
+        })
+
+    if landmark_score < 5.5:
+        lost = round(7.0 - landmark_score, 1)
+        deductions.append({
+            "points_lost": lost,
+            "category": "Landmarks",
+            "title": "Missing Semantic HTML5 & ARIA Landmarks",
+            "reason": "Missing standard <main>, <nav>, or <article> landmarks, making DOM traversal ambiguous for visual agents.",
+            "recommendation": "Wrap primary layout in semantic HTML5 landmarks (<main role='main'>, <nav>, <article>)."
+        })
+
+    if interactive_marks:
+        if label_ratio < 0.85:
+            lost = 4.0 if label_ratio < 0.6 else 2.0
+            deductions.append({
+                "points_lost": lost,
+                "category": "Affordances",
+                "title": "Unlabelled Interactive Affordances",
+                "reason": f"{round((1 - label_ratio) * 100)}% of clickable elements lack explicit accessible text or aria-label attributes.",
+                "recommendation": "Ensure every <button>, <a>, and <input> has explicit aria-label or visible accessible text."
+            })
+    else:
+        deductions.append({
+            "points_lost": 3.0,
+            "category": "Affordances",
+            "title": "No Interactive Affordances Detected",
+            "reason": "Page has no interactive elements grounded in the accessibility tree.",
+            "recommendation": "Expose standard navigable links and action controls in semantic HTML."
+        })
+
+    if traps:
+        lost = round(min(4.0, trap_penalty), 1)
+        trap_names = ", ".join(t.get("name", "Trap") for t in traps)
+        deductions.append({
+            "points_lost": lost,
+            "category": "Navigation Traps",
+            "title": f"Navigation Traps Detected: {trap_names}",
+            "reason": "Modal consent walls, sticky overlays, or bot challenges obstruct automated agent traversal.",
+            "recommendation": "Provide auto-dismissable cookie banners or allow clean bypass for verified agent user-agents."
+        })
+
     return {
         "pillar": "Pillar B: Agent Navigability & Token Cost",
         "score": round(min(25.0, score), 1),
@@ -88,5 +140,6 @@ def score_navigability(
             "traps_detected_count": len(traps),
             "interactive_elements_count": len(interactive_marks)
         },
-        "feedback": feedback
+        "feedback": feedback,
+        "deductions": deductions
     }

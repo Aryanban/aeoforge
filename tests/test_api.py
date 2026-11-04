@@ -26,3 +26,10 @@ def test_deobfuscate_endpoint():
     resp = client.post("/api/v1/deobfuscate-email", json={"html": html})
     assert resp.status_code == 200
     assert "info@aeoforge.dev" in resp.json()["extracted_emails"]
+
+
+def test_batch_audit_validation():
+    # Empty URL list should return 400
+    resp = client.post("/api/v1/audit-batch", json={"urls": []})
+    assert resp.status_code == 400
+

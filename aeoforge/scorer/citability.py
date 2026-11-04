@@ -108,6 +108,37 @@ def score_citability(html: str, text: str) -> Dict[str, Any]:
     else:
         feedback.append("Weak E-E-A-T signals. Add explicit author attribution and publication dates.")
 
+    deductions = []
+
+    if not capsule_found:
+        deductions.append({
+            "points_lost": 6.0,
+            "category": "Answer Capsule",
+            "title": "Missing Direct Answer Capsule Under Headings",
+            "reason": "AI answer engines require 30–70 word direct answer definitions under H1/H2 tags to quote in AI Overviews.",
+            "recommendation": "Inject a concise 40-word answer capsule directly beneath your primary hero heading."
+        })
+
+    if density < 0.4:
+        lost = 3.0 if density >= 0.2 else 6.0
+        deductions.append({
+            "points_lost": lost,
+            "category": "Fact Density",
+            "title": "Low Quantitative & Fact-Triplet Statement Density",
+            "reason": f"Only {round(density * 100)}% of content contains empirical claims, benchmarks, or Subject-Predicate-Object triplets.",
+            "recommendation": "Rephrase marketing claims with verifiable metrics, latencies, dates, and clear active verbs."
+        })
+
+    if eeat_score < 7.0:
+        lost = round(7.0 - eeat_score, 1)
+        deductions.append({
+            "points_lost": lost,
+            "category": "E-E-A-T Provenance",
+            "title": "Missing Author, Publication Date, or Citation Provenance",
+            "reason": "Answer engines require verified authorship (rel='author'), publication dates, and citations to assign high citation weight.",
+            "recommendation": "Add explicit byline markup, <time datetime='...'> timestamps, and linked citations."
+        })
+
     return {
         "pillar": "Pillar A: Citability & Answerability",
         "score": round(min(25.0, score), 1),
@@ -117,5 +148,6 @@ def score_citability(html: str, text: str) -> Dict[str, Any]:
             "fact_density_pct": round(density * 100, 1),
             "eeat_score": round(eeat_score, 1)
         },
-        "feedback": feedback
+        "feedback": feedback,
+        "deductions": deductions
     }

@@ -127,6 +127,53 @@ def score_api_and_data(html: str) -> Dict[str, Any]:
     else:
         feedback.append("No syndication feeds detected.")
 
+    deductions = []
+
+    if not valid_schemas:
+        deductions.append({
+            "points_lost": 10.0,
+            "category": "Schema.org",
+            "title": "Missing Schema.org JSON-LD Structured Data",
+            "reason": "Zero JSON-LD entity graphs detected. Answer engines cannot verify brand entities, knowledge graphs, or ownership.",
+            "recommendation": "Inject Schema.org Organization, WebSite (with SearchAction), and FAQPage JSON-LD graphs into the HTML <head>."
+        })
+    elif len(schema_types) < 2:
+        deductions.append({
+            "points_lost": 4.0,
+            "category": "Schema.org",
+            "title": "Single-Entity Schema.org Graph",
+            "reason": f"Only 1 schema type ({schema_types[0]}) detected. Missing multi-entity relational depth.",
+            "recommendation": "Expand JSON-LD graph to include connected WebSite, SoftwareApplication, or FAQPage nodes."
+        })
+
+    if meta_score < 5.0:
+        lost = round(5.0 - meta_score, 1)
+        deductions.append({
+            "points_lost": lost,
+            "category": "OpenGraph Metadata",
+            "title": "Incomplete OpenGraph & Semantic Metadata",
+            "reason": "Missing og:title, og:description, or standard description tags required for social and AI entity grounding.",
+            "recommendation": "Inject complete OpenGraph tags (og:title, og:description, og:type, og:image) and standard meta descriptions."
+        })
+
+    if not has_webmcp and not discovered_endpoints:
+        deductions.append({
+            "points_lost": 6.0,
+            "category": "Tool Discovery",
+            "title": "No Machine-Executable WebMCP Tools Exposed",
+            "reason": "Site does not declare machine-executable tools or public agent-spec.json for autonomous tool calling.",
+            "recommendation": "Deploy public/agent-spec.json declaring WebMCP or REST action endpoints."
+        })
+
+    if not feeds:
+        deductions.append({
+            "points_lost": 3.0,
+            "category": "Feeds",
+            "title": "Missing RSS / Atom Syndication Feed",
+            "reason": "No machine-readable syndication feed found for real-time document change discovery.",
+            "recommendation": "Publish an RSS or Atom feed linking key content and updates."
+        })
+
     return {
         "pillar": "Pillar D: Structured Data & API Exposeability",
         "score": round(min(25.0, score), 1),
@@ -135,5 +182,6 @@ def score_api_and_data(html: str) -> Dict[str, Any]:
             "schema_types": list(set(schema_types)),
             "discovered_endpoints": discovered_endpoints
         },
-        "feedback": feedback
+        "feedback": feedback,
+        "deductions": deductions
     }

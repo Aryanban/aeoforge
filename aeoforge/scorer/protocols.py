@@ -86,6 +86,45 @@ async def score_protocols(base_url: str) -> Dict[str, Any]:
         except Exception:
             pass
 
+    deductions = []
+
+    if not has_llmstxt:
+        deductions.append({
+            "points_lost": 10.0,
+            "category": "LLMs Directory",
+            "title": "Missing /llms.txt at Domain Root",
+            "reason": "AI answer engines and coding agents (Cursor, Claude, Perplexity) lack a curated markdown navigation manifest.",
+            "recommendation": "Deploy a standardized /llms.txt at the domain root with markdown links to key documentation."
+        })
+
+    if not has_llms_full:
+        deductions.append({
+            "points_lost": 4.0,
+            "category": "Full Documentation",
+            "title": "Missing /llms-full.txt Deep Documentation",
+            "reason": "Agents performing multi-turn RAG or computer use lack a comprehensive single-file text context.",
+            "recommendation": "Generate public/llms-full.txt aggregating complete site documentation."
+        })
+
+    if not ai_crawlers_allowed:
+        lost = 6.0 if "disallow" in feedback[0].lower() else 3.0
+        deductions.append({
+            "points_lost": lost,
+            "category": "Crawler Directives",
+            "title": "Restricted AI Crawler Directives in robots.txt / WAF",
+            "reason": "robots.txt or security firewall restricts Meta-ExternalAgent, PerplexityBot, ClaudeBot, or GPTBot from crawling.",
+            "recommendation": "Add explicit allow rules for verified AI bots in robots.txt and configure Cloudflare WAF bypass."
+        })
+
+    if not has_sitemap:
+        deductions.append({
+            "points_lost": 4.0,
+            "category": "XML Sitemap",
+            "title": "Missing or Inaccessible /sitemap.xml",
+            "reason": "Search engines and LLM crawlers cannot automatically enumerate new or deeply nested routes.",
+            "recommendation": "Publish a standards-compliant XML sitemap at /sitemap.xml."
+        })
+
     return {
         "pillar": "Pillar C: Machine Protocols & Discovery",
         "score": round(min(25.0, score), 1),
@@ -96,5 +135,6 @@ async def score_protocols(base_url: str) -> Dict[str, Any]:
             "has_sitemap_xml": has_sitemap,
             "ai_bots_allowed": ai_crawlers_allowed
         },
-        "feedback": feedback
+        "feedback": feedback,
+        "deductions": deductions
     }

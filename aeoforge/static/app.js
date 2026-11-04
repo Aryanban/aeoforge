@@ -1721,3 +1721,588 @@ window.filterRecommendations = filterRecommendations;
 window.applyRecommendationFix = applyRecommendationFix;
 window.executeInUiCodebasePatch = executeInUiCodebasePatch;
 window.saveCrawlerSettings = saveCrawlerSettings;
+
+// --- Batch Audit & Custom URL List Logic ---
+let currentBatchData = null;
+
+function setAuditMode(mode) {
+  const singleForm = document.getElementById("auditForm");
+  const batchForm = document.getElementById("batchAuditForm");
+  const singleBtn = document.getElementById("modeBtn-single");
+  const batchBtn = document.getElementById("modeBtn-batch");
+  const descLabel = document.getElementById("modeDescriptionLabel");
+
+  if (mode === "batch") {
+    if (singleForm) singleForm.classList.add("hidden");
+    if (batchForm) batchForm.classList.remove("hidden");
+    if (singleBtn) {
+      singleBtn.className = "px-3 py-1 rounded-md segment-tab-inactive transition-all";
+    }
+    if (batchBtn) {
+      batchBtn.className = "px-3 py-1 rounded-md segment-tab-active transition-all";
+    }
+    if (descLabel) {
+      descLabel.textContent = "Concurrent multi-URL AEO audit & comparative matrix";
+    }
+  } else {
+    if (singleForm) singleForm.classList.remove("hidden");
+    if (batchForm) batchForm.classList.add("hidden");
+    if (singleBtn) {
+      singleBtn.className = "px-3 py-1 rounded-md segment-tab-active transition-all";
+    }
+    if (batchBtn) {
+      batchBtn.className = "px-3 py-1 rounded-md segment-tab-inactive transition-all";
+    }
+    if (descLabel) {
+      descLabel.textContent = "4-pillar real-time web agent audit & visual grounding";
+    }
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeBatchResults() {
+  const card = document.getElementById("batchResultsCard");
+  if (card) card.classList.add("hidden");
+}
+
+function loadBatchPreset(presetKey) {
+  const textarea = document.getElementById("batchUrlsTextarea");
+  if (!textarea) return;
+
+  if (presetKey === "cerebralvalley") {
+    textarea.value = [
+      "https://cerebralvalley.ai",
+      "https://cerebralvalley.ai/events",
+      "https://cerebralvalley.ai/hackathons",
+      "https://cerebralvalley.ai/about"
+    ].join("\n");
+  } else if (presetKey === "techdocs") {
+    textarea.value = [
+      "https://docs.python.org/3/tutorial/",
+      "https://docs.python.org/3/library/",
+      "https://stripe.com/docs",
+      "https://linear.app/docs"
+    ].join("\n");
+  }
+  showToast(`Loaded ${presetKey} preset routes`);
+}
+
+async function handleBatchAuditSubmit(event) {
+  event.preventDefault();
+  const textarea = document.getElementById("batchUrlsTextarea");
+  const submitBtn = document.getElementById("batchAuditSubmitBtn");
+  if (!textarea) return;
+
+  const rawLines = textarea.value.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+  if (rawLines.length === 0) {
+    showToast("Please enter at least one URL to audit");
+    return;
+  }
+
+  const originalBtnHtml = submitBtn.innerHTML;
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Scoring ${rawLines.length} Custom URLs...</span>`;
+  if (window.lucide) lucide.createIcons();
+
+  try {
+    const res = await fetch("/api/v1/audit-batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        urls: rawLines,
+        capture_screenshot: false
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Server responded with ${res.status}`);
+    }
+
+    const data = await res.json();
+    currentBatchData = data;
+
+    const card = document.getElementById("batchResultsCard");
+    const summaryStats = document.getElementById("batchSummaryStats");
+    const avgScoreEl = document.getElementById("batchAvgScoreDisplay");
+    const avgGradeBadge = document.getElementById("batchAvgGradeBadge");
+    const tbody = document.getElementById("batchResultsTbody");
+
+    const countAudited = data.pages_audited || data.count || (data.pages ? data.pages.length : (data.results ? data.results.length : 0));
+    const avgGrade = data.sitewide_grade || data.average_grade || "C";
+    const pageItems = data.pages || data.results || [];
+
+    if (card) card.classList.remove("hidden");
+    if (summaryStats) {
+      summaryStats.textContent = `Audited ${countAudited} custom routes in comparative matrix`;
+    }
+    if (avgScoreEl) {
+      avgScoreEl.textContent = (data.average_score || 0).toFixed(1);
+    }
+    if (avgGradeBadge) {
+      avgGradeBadge.textContent = `Grade ${avgGrade}`;
+      if (data.average_score >= 80) {
+        avgGradeBadge.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20";
+      } else if (data.average_score >= 60) {
+        avgGradeBadge.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20";
+      } else {
+        avgGradeBadge.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 font-bold border border-rose-500/20";
+      }
+    }
+
+    if (tbody) {
+      tbody.innerHTML = "";
+      pageItems.forEach((p, idx) => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-white/[0.02] transition-colors";
+        
+        const scoreColor = p.overall_score >= 80 ? "text-emerald-400" : (p.overall_score >= 60 ? "text-amber-400" : "text-rose-400");
+        const gradeBadgeClass = p.overall_score >= 80 
+          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+          : (p.overall_score >= 60 ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20");
+
+        tr.innerHTML = `
+          <td class="p-3">
+            <div class="font-medium text-white truncate max-w-[220px]" title="${escapeHtml(p.url)}">${escapeHtml(p.url)}</div>
+            <div class="text-[10px] text-zinc-500 truncate max-w-[220px]">${escapeHtml(p.title || "")}</div>
+          </td>
+          <td class="p-3">
+            <div class="flex items-center space-x-1.5">
+              <span class="font-bold ${scoreColor}">${p.overall_score.toFixed(1)}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded font-mono ${gradeBadgeClass}">${p.grade}</span>
+            </div>
+          </td>
+          <td class="p-3 text-zinc-300">${(p.citability || 0).toFixed(1)}</td>
+          <td class="p-3 text-zinc-300">${(p.navigability || 0).toFixed(1)}</td>
+          <td class="p-3 text-zinc-300">${(p.protocols || 0).toFixed(1)}</td>
+          <td class="p-3 text-zinc-300">${(p.structured_data || 0).toFixed(1)}</td>
+          <td class="p-3 text-zinc-400 text-[11px] truncate max-w-[240px]" title="${escapeHtml(p.top_deduction || '')}">
+            <span class="text-rose-400 font-mono">${escapeHtml(p.top_deduction || 'None')}</span>
+          </td>
+          <td class="p-3 text-right">
+            <button type="button" onclick="loadBatchResultIntoStudio(${idx})" class="px-2.5 py-1 rounded bg-white/[0.04] hover:bg-white/[0.1] border border-white/10 text-white font-mono text-[11px] transition-all inline-flex items-center space-x-1 hover:border-white/30">
+              <span>Inspect</span>
+              <i data-lucide="arrow-right" class="w-3 h-3"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    if (card) {
+      card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+    showToast(`Scored ${data.pages_audited} custom URLs successfully`);
+  } catch (e) {
+    showToast(`Batch audit error: ${e.message}`);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalBtnHtml;
+    if (window.lucide) lucide.createIcons();
+  }
+}
+
+function loadBatchResultIntoStudio(index) {
+  const list = currentBatchData ? (currentBatchData.pages || currentBatchData.results || []) : [];
+  if (!list[index]) return;
+  const page = list[index];
+  if (page.full_audit) {
+    currentAuditResult = page.full_audit;
+    currentSpecResult = page.full_audit;
+    renderAuditResults(page.full_audit);
+    showToast(`Loaded ${page.url} into studio`);
+    const resultsDiv = document.getElementById("results");
+    if (resultsDiv) resultsDiv.classList.remove("hidden");
+    const display = document.getElementById("scoreDisplay");
+    if (display) display.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}
+
+// --- Pillar Diagnostic & Point Deduction Lab Logic ---
+let currentDrilldownTab = "overall";
+
+function drilldownPillar(pillarKey) {
+  const drawer = document.getElementById("pillarDrilldownDrawer");
+  if (!drawer) return;
+  drawer.classList.remove("hidden");
+  switchDrilldownTab(pillarKey || "overall");
+}
+
+function closePillarDrilldown() {
+  const drawer = document.getElementById("pillarDrilldownDrawer");
+  if (drawer) drawer.classList.add("hidden");
+}
+
+function switchDrilldownTab(tabKey) {
+  currentDrilldownTab = tabKey;
+  const tabs = ["overall", "citability", "navigability", "protocols", "structured_data"];
+  tabs.forEach(t => {
+    const btn = document.getElementById(`dTab-${t}`);
+    if (btn) {
+      if (t === tabKey) {
+        btn.className = "flex-1 px-3 py-1.5 rounded-lg segment-tab-active transition-all";
+      } else {
+        btn.className = "flex-1 px-3 py-1.5 rounded-lg segment-tab-inactive transition-all";
+      }
+    }
+  });
+
+  const titleEl = document.getElementById("drilldownTitle");
+  const subEl = document.getElementById("drilldownSubtitle");
+  const iconBox = document.getElementById("drilldownIconBox");
+  const scoreDisplay = document.getElementById("drilldownScoreDisplay");
+  const scoreMaxDisplay = document.getElementById("drilldownScoreMaxDisplay");
+  const deductionsList = document.getElementById("drilldownDeductionsList");
+  const dedCountEl = document.getElementById("drilldownDeductionCount");
+  const pointsLostBadge = document.getElementById("drilldownPointsLostBadge");
+  const potentialScoreEl = document.getElementById("drilldownPotentialScore");
+  const metricsGrid = document.getElementById("drilldownMetricsGrid");
+  const codeSnippet = document.getElementById("drilldownCodeSnippet");
+
+  if (!currentAuditResult) {
+    if (scoreDisplay) scoreDisplay.textContent = "--";
+    if (deductionsList) deductionsList.innerHTML = `<p class="text-zinc-500 font-mono py-8 text-center">Run an audit first to inspect live point deductions.</p>`;
+    return;
+  }
+
+  const p = currentAuditResult.pillars || {};
+  const pA = p.pillar_a_citability || { score: 0, details: {} };
+  const pB = p.pillar_b_navigability || { score: 0, details: {} };
+  const pC = p.pillar_c_protocols || { score: 0, details: {} };
+  const pD = p.pillar_d_structured_data || { score: 0, details: {} };
+
+  const allDeds = currentAuditResult.deductions || [];
+  let filteredDeds = [];
+  let activeScore = 0;
+  let maxScore = 25;
+  let title = "";
+  let subtitle = "";
+  let iconHtml = "";
+  let snippetText = "";
+
+  if (tabKey === "citability") {
+    activeScore = pA.score;
+    maxScore = 25;
+    filteredDeds = allDeds.filter(d => d.pillar_key === "citability");
+    title = "Pillar A: Citability & Answerability Diagnostics";
+    subtitle = "Direct answer capsules, empirical triplet density, and E-E-A-T provenance";
+    if (iconBox) iconBox.className = "w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center";
+    iconHtml = `<i data-lucide="quote" class="w-5 h-5"></i>`;
+
+    if (metricsGrid) {
+      metricsGrid.innerHTML = `
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">Fact-Triplet Density</span>
+          <strong class="text-white font-mono text-sm">${pA.details.fact_density_pct || 0}%</strong>
+          <span class="text-[10px] text-zinc-500 block">Target: >= 40%</span>
+        </div>
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">Direct Answer Capsule</span>
+          <strong class="${pA.details.has_direct_answer_capsule ? 'text-emerald-400' : 'text-rose-400'} font-mono text-sm">${pA.details.has_direct_answer_capsule ? 'Pass (Verified)' : 'Fail (Missing)'}</strong>
+          <span class="text-[10px] text-zinc-500 block">Required for AI Overviews</span>
+        </div>
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">Definition Blocks</span>
+          <strong class="text-white font-mono text-sm">${pA.details.definition_blocks_found || 0}</strong>
+          <span class="text-[10px] text-zinc-500 block">&lt;dfn&gt; and semantic definitions</span>
+        </div>
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">E-E-A-T Signal Authority</span>
+          <strong class="text-white font-mono text-sm">${pA.details.eeat_score || 0} / 7.0</strong>
+          <span class="text-[10px] text-zinc-500 block">Author bylines & timestamps</span>
+        </div>
+      `;
+    }
+
+    snippetText = `<!-- Citability Remediation: 40-word Direct Answer Capsule + E-E-A-T Provenance -->
+<section class="aeo-answer-capsule" itemscope itemtype="https://schema.org/AboutPage">
+  <h1>${escapeHtml(currentAuditResult.title || 'Platform Overview')}</h1>
+  <p class="answer-definition text-lg leading-relaxed">
+    <strong>[Primary Entity]</strong> is an autonomous platform that accelerates [primary value proposition] with [quantified benchmark, e.g. 99.8% precision, sub-10ms latency]. Designed for [target audience], it unifies [core capability] with [secondary capability].
+  </p>
+  <footer class="eeat-provenance text-xs text-muted">
+    <span>Written by <a href="/team" rel="author">Engineering Staff</a></span> •
+    <time datetime="${new Date().toISOString().split('T')[0]}">Updated ${new Date().toLocaleDateString()}</time>
+  </footer>
+</section>`;
+
+  } else if (tabKey === "navigability") {
+    activeScore = pB.score;
+    maxScore = 25;
+    filteredDeds = allDeds.filter(d => d.pillar_key === "navigability");
+    title = "Pillar B: Agent Navigability & Token Cost Diagnostics";
+    subtitle = "DOM token efficiency, landmark semantics, and trap-free navigation";
+    if (iconBox) iconBox.className = "w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center";
+    iconHtml = `<i data-lucide="compass" class="w-5 h-5"></i>`;
+
+    if (metricsGrid) {
+      metricsGrid.innerHTML = `
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">DOM Text-to-Token Ratio</span>
+          <strong class="text-white font-mono text-sm">${pB.details.token_efficiency_ratio || 0}%</strong>
+          <span class="text-[10px] text-zinc-500 block">Target: >= 15%</span>
+        </div>
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">Interactive Marks</span>
+          <strong class="text-white font-mono text-sm">${pB.details.interactive_elements_count || 0} grounded</strong>
+          <span class="text-[10px] text-zinc-500 block">Accessibility Tree affordances</span>
+        </div>
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">Blocker Traps</span>
+          <strong class="${(pB.details.traps_detected_count || 0) === 0 ? 'text-emerald-400' : 'text-rose-400'} font-mono text-sm">${pB.details.traps_detected_count || 0}</strong>
+          <span class="text-[10px] text-zinc-500 block">Cookie walls & sticky modals</span>
+        </div>
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">Useful Text Content</span>
+          <strong class="text-white font-mono text-sm">${pB.details.text_tokens || 0} tokens</strong>
+          <span class="text-[10px] text-zinc-500 block">Clean navigable text</span>
+        </div>
+      `;
+    }
+
+    snippetText = `<!-- Navigability Remediation: Trap-Free Semantic HTML5 Layout -->
+<header role="banner" class="site-header">
+  <nav role="navigation" aria-label="Main Navigation">
+    <a href="/" aria-current="page">Home</a>
+    <a href="/events" aria-label="Upcoming Events">Events</a>
+    <a href="/hackathons" aria-label="Hackathons Schedule">Hackathons</a>
+  </nav>
+</header>
+<main role="main" id="main-content">
+  <article>
+    <!-- Primary Content -->
+  </article>
+</main>`;
+
+  } else if (tabKey === "protocols") {
+    activeScore = pC.score;
+    maxScore = 25;
+    filteredDeds = allDeds.filter(d => d.pillar_key === "protocols");
+    title = "Pillar C: Machine Protocols & Discovery Diagnostics";
+    subtitle = "llms.txt AI directory, robots.txt crawler access, and sitemaps";
+    if (iconBox) iconBox.className = "w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center";
+    iconHtml = `<i data-lucide="file-code-2" class="w-5 h-5"></i>`;
+
+    if (metricsGrid) {
+      metricsGrid.innerHTML = `
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">/llms.txt Standard</span>
+          <strong class="${pC.details.llms_txt_status ? 'text-emerald-400' : 'text-rose-400'} font-mono text-sm">${pC.details.llms_txt_status ? 'Present (Verified)' : 'Missing (-10 pts)'}</strong>
+          <span class="text-[10px] text-zinc-500 block">Autonomous agent index</span>
+        </div>
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">/llms-full.txt Deep RAG</span>
+          <strong class="${pC.details.has_llms_full_txt ? 'text-emerald-400' : 'text-amber-400'} font-mono text-sm">${pC.details.has_llms_full_txt ? 'Present' : 'Missing (-4 pts)'}</strong>
+          <span class="text-[10px] text-zinc-500 block">Single-file markdown dump</span>
+        </div>
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">AI Bot Directives</span>
+          <strong class="${pC.details.ai_bots_allowed ? 'text-emerald-400' : 'text-rose-400'} font-mono text-sm">${pC.details.ai_bots_allowed ? 'Allowed' : 'Restricted (-6 pts)'}</strong>
+          <span class="text-[10px] text-zinc-500 block">GPTBot, Meta, Perplexity</span>
+        </div>
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">XML Sitemap</span>
+          <strong class="${pC.details.has_sitemap_xml ? 'text-emerald-400' : 'text-rose-400'} font-mono text-sm">${pC.details.has_sitemap_xml ? 'Present' : 'Missing (-4 pts)'}</strong>
+          <span class="text-[10px] text-zinc-500 block">/sitemap.xml route graph</span>
+        </div>
+      `;
+    }
+
+    snippetText = currentAuditResult.llms_txt || `# /llms.txt Standard for ${currentAuditResult.domain || 'Site'}
+> Machine-readable navigation directory generated by AEOForge.
+
+## Core Navigation
+- [Home](https://${currentAuditResult.domain || 'example.com'}): Platform overview
+- [Events](https://${currentAuditResult.domain || 'example.com'}/events): Scheduled hackathons and developer summits
+- [Full Documentation](https://${currentAuditResult.domain || 'example.com'}/llms-full.txt): Complete concatenated documentation for agent RAG`;
+
+  } else if (tabKey === "structured_data") {
+    activeScore = pD.score;
+    maxScore = 25;
+    filteredDeds = allDeds.filter(d => d.pillar_key === "structured_data");
+    title = "Pillar D: Structured Data & WebMCP Tools Diagnostics";
+    subtitle = "Schema.org entity knowledge graphs, WebMCP specs, and feed discovery";
+    if (iconBox) iconBox.className = "w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center";
+    iconHtml = `<i data-lucide="database" class="w-5 h-5"></i>`;
+
+    const schemaTypes = (pD.details.schema_types || []).join(", ") || "None";
+    if (metricsGrid) {
+      metricsGrid.innerHTML = `
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">Schema.org Graphs</span>
+          <strong class="${(pD.details.schemas_found || 0) > 0 ? 'text-emerald-400' : 'text-rose-400'} font-mono text-sm">${pD.details.schemas_found || 0} valid entities</strong>
+          <span class="text-[10px] text-zinc-500 block truncate" title="${escapeHtml(schemaTypes)}">${escapeHtml(schemaTypes)}</span>
+        </div>
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">WebMCP Tool Calling</span>
+          <strong class="${pD.details.webmcp_tools_exposed ? 'text-emerald-400' : 'text-amber-400'} font-mono text-sm">${pD.details.webmcp_tools_exposed ? 'Exposed' : 'Missing (-6 pts)'}</strong>
+          <span class="text-[10px] text-zinc-500 block">agent-spec.json tool discovery</span>
+        </div>
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">Discovered Endpoints</span>
+          <strong class="text-white font-mono text-sm">${(pD.details.discovered_endpoints || []).length} APIs</strong>
+          <span class="text-[10px] text-zinc-500 block">REST & GraphQL endpoints</span>
+        </div>
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">Syndication Feeds</span>
+          <strong class="${pD.details.rss_feed_found ? 'text-emerald-400' : 'text-zinc-400'} font-mono text-sm">${pD.details.rss_feed_found ? 'Active' : 'Missing (-3 pts)'}</strong>
+          <span class="text-[10px] text-zinc-500 block">RSS / Atom real-time updates</span>
+        </div>
+      `;
+    }
+
+    snippetText = currentAuditResult.schema_jsonld ? JSON.stringify(currentAuditResult.schema_jsonld, null, 2) : `<!-- Schema.org JSON-LD Knowledge Graph -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://${currentAuditResult.domain || 'example.com'}#organization",
+      "name": "${currentAuditResult.title || 'Brand'}",
+      "url": "https://${currentAuditResult.domain || 'example.com'}"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://${currentAuditResult.domain || 'example.com'}#website",
+      "url": "https://${currentAuditResult.domain || 'example.com'}",
+      "name": "${currentAuditResult.title || 'Brand'}"
+    }
+  ]
+}
+</script>`;
+
+  } else {
+    // Overall view
+    activeScore = currentAuditResult.overall_score;
+    maxScore = 100;
+    filteredDeds = allDeds;
+    title = "Sitewide AEO Loss Analysis & Complete Roadmap to 100";
+    subtitle = `All ${allDeds.length} point deductions across Citability, Navigability, Protocols, and Structured Data`;
+    if (iconBox) iconBox.className = "w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center";
+    iconHtml = `<i data-lucide="crosshair" class="w-5 h-5"></i>`;
+
+    if (metricsGrid) {
+      metricsGrid.innerHTML = `
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">Citability Pillar</span>
+          <strong class="text-blue-400 font-mono text-sm">${pA.score.toFixed(1)} / 25</strong>
+          <span class="text-[10px] text-zinc-500 block">Lost: -${(25 - pA.score).toFixed(1)} pts</span>
+        </div>
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">Navigability Pillar</span>
+          <strong class="text-emerald-400 font-mono text-sm">${pB.score.toFixed(1)} / 25</strong>
+          <span class="text-[10px] text-zinc-500 block">Lost: -${(25 - pB.score).toFixed(1)} pts</span>
+        </div>
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">Protocols Pillar</span>
+          <strong class="text-amber-400 font-mono text-sm">${pC.score.toFixed(1)} / 25</strong>
+          <span class="text-[10px] text-zinc-500 block">Lost: -${(25 - pC.score).toFixed(1)} pts</span>
+        </div>
+        <div class="p-2.5 bg-[#08080a] border border-white/[0.06] rounded-lg">
+          <span class="text-zinc-500 font-mono text-[10px] block">Structured Data Pillar</span>
+          <strong class="text-purple-400 font-mono text-sm">${pD.score.toFixed(1)} / 25</strong>
+          <span class="text-[10px] text-zinc-500 block">Lost: -${(25 - pD.score).toFixed(1)} pts</span>
+        </div>
+      `;
+    }
+
+    snippetText = `# Roadmap to 100/100 AEO Readiness for ${currentAuditResult.domain || 'Site'}
+Current Score: ${currentAuditResult.overall_score} / 100 (Grade ${currentAuditResult.grade})
+Target Score:  100.0 / 100 (Grade A+ Agent Native)
+
+1. Deploy /llms.txt & /llms-full.txt (+14.0 pts)
+2. Inject Schema.org Multi-Entity Knowledge Graph (+10.0 pts)
+3. Add 40-word Direct Answer Capsule under H1 (+6.0 pts)
+4. Allow Meta-ExternalAgent & GPTBot in robots.txt (+6.0 pts)
+5. Expose public/agent-spec.json for autonomous tool calling (+6.0 pts)`;
+  }
+
+  // Update header text and elements
+  if (titleEl) titleEl.textContent = title;
+  if (subEl) subEl.textContent = subtitle;
+  if (iconBox) iconBox.innerHTML = iconHtml;
+  if (scoreDisplay) scoreDisplay.textContent = activeScore.toFixed(1);
+  if (scoreMaxDisplay) scoreMaxDisplay.textContent = `/ ${maxScore}`;
+
+  const totalPointsLost = Math.max(0, maxScore - activeScore);
+  if (pointsLostBadge) {
+    pointsLostBadge.textContent = `-${totalPointsLost.toFixed(1)} pts deducted from maximum`;
+  }
+  if (potentialScoreEl) {
+    potentialScoreEl.textContent = tabKey === "overall" ? "100.0 / 100" : "25.0 / 25";
+  }
+  if (dedCountEl) {
+    dedCountEl.textContent = `${filteredDeds.length} findings (${-totalPointsLost.toFixed(1)} pts total)`;
+  }
+
+  // Render deduction cards
+  if (deductionsList) {
+    if (filteredDeds.length === 0) {
+      deductionsList.innerHTML = `
+        <div class="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-center space-y-1">
+          <div class="text-emerald-400 font-semibold text-xs flex items-center justify-center space-x-1.5">
+            <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+            <span>Flawless Evaluation — Zero Point Deductions</span>
+          </div>
+          <p class="text-zinc-400 font-mono text-[11px]">This pillar achieved a near-perfect evaluation with no architectural blockers.</p>
+        </div>
+      `;
+    } else {
+      deductionsList.innerHTML = "";
+      filteredDeds.forEach((d) => {
+        const card = document.createElement("div");
+        card.className = "p-3.5 bg-[#08080a] border border-white/[0.08] hover:border-white/20 rounded-xl space-y-2 transition-all shadow-sm";
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-3">
+            <div class="space-y-0.5">
+              <div class="flex items-center space-x-2">
+                <span class="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">-${(d.points_lost || 0).toFixed(1)} pts</span>
+                <span class="text-[10px] font-mono text-zinc-500 px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/[0.06]">${escapeHtml(d.category || d.pillar || 'Deduction')}</span>
+              </div>
+              <h5 class="text-xs font-semibold text-white mt-1">${escapeHtml(d.title)}</h5>
+            </div>
+          </div>
+          
+          <div class="p-2.5 rounded-lg bg-zinc-900/60 border border-white/[0.04] space-y-1 text-[11px] font-mono leading-relaxed">
+            <div class="text-zinc-400">
+              <span class="text-rose-400 font-semibold">Why points were lost:</span>
+              <span class="text-zinc-300 ml-1">${escapeHtml(d.reason)}</span>
+            </div>
+            <div class="text-zinc-400 pt-1 border-t border-white/[0.04]">
+              <span class="text-emerald-400 font-semibold">Actionable Remedy:</span>
+              <span class="text-zinc-200 ml-1">${escapeHtml(d.recommendation)}</span>
+            </div>
+          </div>
+        `;
+        deductionsList.appendChild(card);
+      });
+    }
+  }
+
+  if (codeSnippet) {
+    codeSnippet.textContent = snippetText;
+  }
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function copyDrilldownSnippet() {
+  const code = document.getElementById("drilldownCodeSnippet");
+  if (code) {
+    navigator.clipboard.writeText(code.textContent);
+    showToast("Remediation code copied to clipboard");
+  }
+}
+
+window.setAuditMode = setAuditMode;
+window.closeBatchResults = closeBatchResults;
+window.loadBatchPreset = loadBatchPreset;
+window.handleBatchAuditSubmit = handleBatchAuditSubmit;
+window.loadBatchResultIntoStudio = loadBatchResultIntoStudio;
+window.drilldownPillar = drilldownPillar;
+window.closePillarDrilldown = closePillarDrilldown;
+window.switchDrilldownTab = switchDrilldownTab;
+window.copyDrilldownSnippet = copyDrilldownSnippet;
+

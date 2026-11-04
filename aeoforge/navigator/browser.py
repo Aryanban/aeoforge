@@ -98,13 +98,6 @@ class BrowserNavigator:
                 locale="en-US",
                 extra_http_headers={
                     "Accept-Language": "en-US,en;q=0.9",
-                    "Sec-Ch-Ua": '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
-                    "Sec-Ch-Ua-Mobile": "?0",
-                    "Sec-Ch-Ua-Platform": DEFAULT_UA_PLATFORM,
-                    "Sec-Fetch-Dest": "document",
-                    "Sec-Fetch-Mode": "navigate",
-                    "Sec-Fetch-Site": "none",
-                    "Sec-Fetch-User": "?1",
                     "Upgrade-Insecure-Requests": "1"
                 }
             )
@@ -128,12 +121,20 @@ class BrowserNavigator:
                 response = await page.goto(url, wait_until="domcontentloaded", timeout=self.timeout_ms)
                 if response:
                     http_status = response.status
-                # Dynamic hydration check: wait until DOM has children with 200ms debounce
+                
+                # Dynamic hydration for modern SPAs (Next.js, React, Vue):
+                # Wait for network stabilization and document rendering with fallback debounce
                 try:
-                    await page.wait_for_function("() => document.body && document.body.children.length > 0", timeout=1000)
+                    await page.wait_for_load_state("networkidle", timeout=3500)
                 except Exception:
                     pass
-                await page.wait_for_timeout(200)
+                
+                # Verify body has rendered content
+                try:
+                    await page.wait_for_function("() => document.body && document.body.innerText.trim().length > 20", timeout=2000)
+                except Exception:
+                    pass
+                await page.wait_for_timeout(300)
             except Exception as e:
                 pass
 

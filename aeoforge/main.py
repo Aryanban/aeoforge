@@ -1,5 +1,6 @@
 """FastAPI Application Server for AEOForge."""
 
+import asyncio
 import io
 import json
 import os
@@ -64,7 +65,12 @@ class BundleExportRequest(BaseModel):
 
 class CrawlRequest(BaseModel):
     url: str
-    max_pages: int = 3
+    max_pages: int = 10
+
+
+class BatchAuditRequest(BaseModel):
+    urls: List[str]
+    capture_screenshot: bool = False
 
 
 class PatchRequest(BaseModel):
@@ -293,7 +299,7 @@ async def crawl_endpoint(request: CrawlRequest):
         parsed_entry = urlparse(request.url)
         results = []
 
-        while queue and len(visited_urls) < min(request.max_pages, 10):
+        while queue and len(visited_urls) < min(request.max_pages, 1000):
             current_url = queue.pop(0)
             if current_url in visited_urls:
                 continue
@@ -342,6 +348,86 @@ async def crawl_endpoint(request: CrawlRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Crawl failed: {str(e)}")
+
+
+@app.post("/api/v1/audit-batch")
+async def audit_batch_endpoint(request: BatchAuditRequest):
+    """Audit a custom list of user-provided URLs concurrently and synthesize a comparative AEO score matrix."""
+    if not request.urls:
+        raise HTTPException(status_code=400, detail="URL list cannot be empty")
+
+    clean_urls = []
+    for u in request.urls:
+        u_str = u.strip()
+        if u_str:
+            if not u_str.startswith("http://") and not u_str.startswith("https://"):
+                u_str = "https://" + u_str
+            if u_str not in clean_urls:
+                clean_urls.append(u_str)
+
+    clean_urls = clean_urls[:50]  # Cap concurrent batch at 50 URLs
+    sem = asyncio.Semaphore(5)
+
+    async def audit_single(target_url: str):
+        async with sem:
+            try:
+                nav = BrowserNavigator(timeout_ms=25000)
+                nav_data = await nav.inspect_url(target_url, capture_screenshot=request.capture_screenshot)
+                scorer = AEOScoringEngine()
+                audit = await scorer.audit(
+                    url=nav_data.final_url,
+                    html=nav_data.html,
+                    text_content=nav_data.text_content,
+                    raw_html_tokens=nav_data.raw_html_tokens,
+                    text_tokens=nav_data.text_tokens,
+                    traps=nav_data.traps,
+                    interactive_marks=nav_data.interactive_marks,
+                    a11y_tree=nav_data.a11y_tree
+                )
+                audit.title = nav_data.title
+                p = audit.pillars
+                top_ded = audit.deductions[0] if (audit.deductions and len(audit.deductions) > 0) else None
+                return {
+                    "url": target_url,
+                    "final_url": nav_data.final_url,
+                    "title": nav_data.title or target_url,
+                    "overall_score": audit.overall_score,
+                    "grade": audit.grade,
+                    "status": audit.status,
+                    "citability": p.get("pillar_a_citability", {}).get("score", 0),
+                    "navigability": p.get("pillar_b_navigability", {}).get("score", 0),
+                    "protocols": p.get("pillar_c_protocols", {}).get("score", 0),
+                    "structured_data": p.get("pillar_d_structured_data", {}).get("score", 0),
+                    "traps_count": len(nav_data.traps),
+                    "deductions_count": len(audit.deductions or []),
+                    "top_deduction": f"-{top_ded['points_lost']} pts: {top_ded['title']}" if top_ded else "None",
+                    "full_audit": audit.model_dump()
+                }
+            except Exception as e:
+                return {
+                    "url": target_url,
+                    "error": str(e),
+                    "overall_score": 0.0,
+                    "grade": "F",
+                    "status": "Failed"
+                }
+
+    results = await asyncio.gather(*(audit_single(u) for u in clean_urls))
+    valid_results = [r for r in results if "error" not in r]
+    avg_score = round(sum(r["overall_score"] for r in valid_results) / max(1, len(valid_results)), 1) if valid_results else 0.0
+    grade, status = calculate_grade(avg_score)
+
+    return {
+        "count": len(results),
+        "pages_audited": len(results),
+        "valid_count": len(valid_results),
+        "average_score": avg_score,
+        "average_grade": grade,
+        "sitewide_grade": grade,
+        "average_status": status,
+        "results": results,
+        "pages": results
+    }
 
 
 @app.post("/api/v1/spec")

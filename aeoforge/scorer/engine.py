@@ -38,6 +38,7 @@ class AEOAuditResult(BaseModel):
     waf_rules: Optional[Dict[str, str]] = None
     audit_id: Optional[str] = None
     progression: Optional[Dict[str, Any]] = None
+    deductions: Optional[List[Dict[str, Any]]] = None
 
 
 def calculate_grade(score: float) -> tuple[str, str]:
@@ -162,6 +163,25 @@ class AEOScoringEngine:
         domain = urlparse(url).netloc or "example.com"
         waf_rules = generate_waf_rules(domain)
 
+        all_deductions = []
+        for d in p_a.get("deductions", []):
+            d["pillar_key"] = "citability"
+            d["pillar"] = "Citability & Answerability"
+            all_deductions.append(d)
+        for d in p_b.get("deductions", []):
+            d["pillar_key"] = "navigability"
+            d["pillar"] = "Agent Navigability & Token Cost"
+            all_deductions.append(d)
+        for d in p_c.get("deductions", []):
+            d["pillar_key"] = "protocols"
+            d["pillar"] = "Machine Protocols & Discovery"
+            all_deductions.append(d)
+        for d in p_d.get("deductions", []):
+            d["pillar_key"] = "structured_data"
+            d["pillar"] = "Structured Data & Tools"
+            all_deductions.append(d)
+        all_deductions.sort(key=lambda d: d.get("points_lost", 0), reverse=True)
+
         return AEOAuditResult(
             url=url,
             overall_score=total_score,
@@ -186,5 +206,6 @@ class AEOScoringEngine:
             schema_jsonld=schema,
             recommendations=recs,
             potential_score=potential_score,
-            waf_rules=waf_rules
+            waf_rules=waf_rules,
+            deductions=all_deductions
         )
