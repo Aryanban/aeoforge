@@ -79,6 +79,7 @@ screenshots/
 *.log
 *.pdf
 *.html
+!aeoforge/static/index.html
 output_test/
 data/
 agent-spec.json

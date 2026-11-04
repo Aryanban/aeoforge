@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AEOForge • Web Agent-Readiness & AEO Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="/static/style.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            zinc: {
+              850: '#1a1a22',
+              900: '#121217',
+              925: '#0c0c10',
+              950: '#08080a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-[#08080a] text-[#fcfcfd] min-h-screen flex flex-col font-sans selection:bg-white selection:text-black">
+
+  <!-- WCAG 2.1 AA Skip to Content Link -->
+  <a href="#mainWorkspace" class="skip-to-content-link font-mono text-xs">Skip to main content</a>
+
+  <!-- Minimalist Executive Header -->
+  <header role="banner" class="border-b border-white/[0.06] bg-[#08080a]/90 sticky top-0 z-40 backdrop-blur-md">
+    <div class="max-w-[1600px] mx-auto px-6 h-14 flex items-center justify-between">
+      
+      <!-- Brand & Descriptor -->
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center text-white shadow-sm">
+          <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 2 22 22 22 12 2"></polygon>
+            <circle cx="12" cy="15" r="2" fill="currentColor"></circle>
+          </svg>
+        </div>
+        <div class="flex items-baseline space-x-2">
+          <span class="font-bold text-sm tracking-tight text-white">AEOForge</span>
+          <span class="text-xs text-zinc-400 font-normal">Agent-Readiness Studio</span>
+        </div>
+      </div>
+
+      <!-- Center Telemetry Pill (Clickable Model Selector) -->
+      <button onclick="openModelSettingsModal()" id="engineStatusBadge" class="hidden lg:flex items-center space-x-2 px-3 py-1.5 rounded-full bg-zinc-900/90 hover:bg-zinc-800/90 border border-white/[0.08] hover:border-white/20 text-xs font-mono transition-all cursor-pointer group shadow-sm" title="Configure AI Model and execution harness" aria-label="Configure AI Model and execution harness">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        <span id="engineStatusLabel" class="text-zinc-300 group-hover:text-white transition-colors">Meta Llama 3.2 · Local M4 · 45 tok/s</span>
+        <i data-lucide="sliders-horizontal" class="w-3 h-3 text-zinc-500 group-hover:text-zinc-300 transition-colors ml-0.5"></i>
+      </button>
+
+      <!-- Right Utility Actions -->
+      <div class="flex items-center space-x-2">
+        
+        <!-- Theme Switcher (Dark / Light / System) -->
+        <div class="flex items-center p-0.5 rounded-lg bg-zinc-900 border border-white/10 text-xs font-mono" role="radiogroup" aria-label="Color theme switcher">
+          <button type="button" onclick="setTheme('dark')" id="themeBtn-dark" class="p-1.5 rounded-md text-zinc-400 hover:text-white transition-all segment-tab-active" title="Dark theme" aria-label="Switch to dark theme">
+            <i data-lucide="moon" class="w-3.5 h-3.5"></i>
+          </button>
+          <button type="button" onclick="setTheme('light')" id="themeBtn-light" class="p-1.5 rounded-md text-zinc-400 hover:text-white transition-all segment-tab-inactive" title="Light theme" aria-label="Switch to light theme">
+            <i data-lucide="sun" class="w-3.5 h-3.5"></i>
+          </button>
+          <button type="button" onclick="setTheme('system')" id="themeBtn-system" class="p-1.5 rounded-md text-zinc-400 hover:text-white transition-all segment-tab-inactive" title="System preference theme" aria-label="Match system theme">
+            <i data-lucide="laptop" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+
+        <!-- Persistent History & Progression Button -->
+        <button onclick="toggleDrawer('historyDrawer')" id="historyDrawerBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] transition-all flex items-center space-x-1.5" title="Audit history and progression (⌘H)" aria-label="Open Audit History and Progression">
+          <i data-lucide="history" class="w-3.5 h-3.5 text-zinc-400"></i>
+          <span>History</span>
+          <span id="historyCountBadge" class="hidden text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20">0</span>
+        </button>
+
+        <!-- Technical Setup & Codebase Patcher Button -->
+        <button onclick="openTechnicalSetupModal()" id="technicalSetupBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] transition-all flex items-center space-x-1.5" title="Technical setup and codebase patcher (⌘S)" aria-label="Open Technical Setup and Configuration">
+          <i data-lucide="wrench" class="w-3.5 h-3.5 text-zinc-400"></i>
+          <span class="hidden md:inline">Setup</span>
+        </button>
+
+        <!-- Competitor Outranking Lab Button -->
+        <button onclick="toggleDrawer('compareDrawer')" class="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] transition-all flex items-center space-x-1.5" title="Compare against competitor (⌘1)" aria-label="Open Competitor Outranking Lab">
+          <i data-lucide="git-compare" class="w-3.5 h-3.5 text-zinc-400"></i>
+          <span>Competitor Lab</span>
+        </button>
+
+        <!-- Auxiliary Tools Menu Dropdown -->
+        <div class="relative group">
+          <button type="button" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] transition-all flex items-center space-x-1" title="Additional utilities">
+            <span>Tools</span>
+            <i data-lucide="chevron-down" class="w-3 h-3 text-zinc-500"></i>
+          </button>
+          <div class="absolute right-0 top-full mt-1.5 w-44 bg-zinc-925 border border-white/10 rounded-xl p-1 shadow-2xl hidden group-hover:block hover:block z-50 space-y-0.5">
+            <button onclick="toggleDrawer('crawlerDrawer')" class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/[0.06] transition-all flex items-center space-x-2">
+              <i data-lucide="network" class="w-3.5 h-3.5 text-zinc-400"></i>
+              <span>Sitewide Crawler</span>
+            </button>
+            <button onclick="toggleDrawer('deobfuscatorDrawer')" class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/[0.06] transition-all flex items-center space-x-2">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5 text-zinc-400"></i>
+              <span>Deobfuscator</span>
+            </button>
+            <button onclick="toggleDrawer('mcpDrawer')" class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/[0.06] transition-all flex items-center space-x-2">
+              <i data-lucide="cpu" class="w-3.5 h-3.5 text-zinc-400"></i>
+              <span>MCP Server</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Export Bundle Primary Button -->
+        <button onclick="exportCurrentBundle()" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-black bg-white hover:bg-zinc-200 transition-all flex items-center space-x-1.5 shadow-sm ml-1" title="Download production-ready package (.zip)" aria-label="Export complete AEO package as zip">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span>Export Bundle</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Workspace Canvas -->
+  <main id="mainWorkspace" role="main" tabindex="-1" class="flex-1 max-w-[1600px] w-full mx-auto px-6 py-6 space-y-6 outline-none">
+
+    <!-- Precision Command Dock -->
+    <div class="relative bg-zinc-925 border border-white/[0.08] rounded-2xl p-5 shadow-2xl">
+      <form id="auditForm" onsubmit="handleAuditSubmit(event)" class="space-y-3.5">
+        <div class="flex flex-col sm:flex-row items-stretch gap-3">
+          
+          <!-- Unified High-Contrast Input -->
+          <div class="relative flex-1 flex items-center bg-[#08080a] border border-white/[0.12] focus-within:border-white/40 focus-within:ring-2 focus-within:ring-white/10 rounded-xl px-4 py-3 transition-all">
+            <span class="text-zinc-500 font-mono text-xs select-none pr-2">https://</span>
+            <input 
+              type="text" 
+              id="targetUrlInput" 
+              required 
+              placeholder="docs.python.org, stripe.com, or linear.app" 
+              value="docs.python.org"
+              class="w-full bg-transparent text-sm text-white placeholder-zinc-600 outline-none font-mono"
+            >
+            <div class="flex items-center space-x-1 text-zinc-500 text-xs font-mono select-none pl-3">
+              <span class="kbd-chip">⌘K</span>
+            </div>
+          </div>
+
+          <!-- Primary Audit Action -->
+          <button 
+            type="submit" 
+            id="auditSubmitBtn"
+            class="px-6 py-3 bg-white hover:bg-zinc-200 active:scale-[0.98] text-black font-semibold text-xs rounded-xl transition-all flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50 whitespace-nowrap"
+          >
+            <i data-lucide="play" class="w-3.5 h-3.5 fill-black"></i>
+            <span>Audit Agent Readiness</span>
+          </button>
+        </div>
+
+        <!-- Quick Demo Presets & Controls -->
+        <div class="flex flex-wrap items-center justify-between text-xs text-zinc-400 pt-0.5 gap-3">
+          <div class="flex flex-wrap items-center gap-1.5">
+            <span class="text-zinc-500 text-xs mr-1">Quick Benchmarks:</span>
+            <button type="button" onclick="loadPreset('docs.python.org')" class="px-2.5 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-zinc-300 hover:text-white text-xs font-mono transition-all">docs.python.org</button>
+            <button type="button" onclick="loadPreset('cerebralvalley.ai')" class="px-2.5 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-zinc-300 hover:text-white text-xs font-mono transition-all">cerebralvalley.ai</button>
+            <button type="button" onclick="loadPreset('linear.app')" class="px-2.5 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-zinc-300 hover:text-white text-xs font-mono transition-all">linear.app</button>
+            <button type="button" onclick="loadPreset('stripe.com')" class="px-2.5 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-zinc-300 hover:text-white text-xs font-mono transition-all">stripe.com</button>
+            <button type="button" onclick="loadPreset('example.com')" class="px-2.5 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-zinc-300 hover:text-white text-xs font-mono transition-all">example.com</button>
+          </div>
+
+          <div class="flex items-center space-x-4 text-xs text-zinc-400">
+            <label class="flex items-center space-x-2 cursor-pointer select-none">
+              <input type="checkbox" id="screenshotToggle" checked class="rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 w-3.5 h-3.5 accent-white">
+              <span class="text-zinc-300">Set-of-Mark Coordinate Grounding</span>
+            </label>
+            <span class="text-zinc-600 hidden sm:inline">•</span>
+            <span class="text-zinc-500 font-mono hidden sm:inline">Press ↵ to audit</span>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Interactive Step-by-Step Reactive Loading State -->
+    <div id="loadingIndicator" class="hidden bg-zinc-925 border border-white/[0.08] rounded-2xl p-8 space-y-5 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+        <div class="flex items-center space-x-3">
+          <div class="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center animate-spin">
+            <i data-lucide="loader-2" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-white tracking-tight" id="loadingHeadline">Auditing Target Domain...</h3>
+            <p class="text-xs text-zinc-400 font-mono" id="loadingSubtext">Executing real-time DOM telemetry and stealth verification</p>
+          </div>
+        </div>
+        <div class="text-right">
+          <span class="text-xs font-mono font-bold text-blue-400" id="loadingProgressPct">25%</span>
+        </div>
+      </div>
+
+      <!-- Animated Progress Track -->
+      <div class="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+        <div id="loadingProgressBar" class="bg-gradient-to-r from-blue-500 to-indigo-500 h-1.5 rounded-full transition-all duration-700" style="width: 25%"></div>
+      </div>
+
+      <!-- 4 Live Execution Stages -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+        <div id="step-1" class="p-3 bg-[#08080a] border border-blue-500/30 rounded-xl space-y-1 transition-all">
+          <div class="flex items-center space-x-1.5 text-blue-400 font-semibold">
+            <i data-lucide="shield" class="w-3.5 h-3.5"></i>
+            <span>1. Stealth Session</span>
+          </div>
+          <p class="text-[11px] text-zinc-400">Headless Playwright navigation & anti-bot bypass</p>
+        </div>
+
+        <div id="step-2" class="p-3 bg-[#08080a] border border-white/[0.06] rounded-xl space-y-1 transition-all opacity-50">
+          <div class="flex items-center space-x-1.5 text-zinc-400 font-semibold">
+            <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+            <span>2. Visual Grounding</span>
+          </div>
+          <p class="text-[11px] text-zinc-400">Set-of-Mark coordinate detection</p>
+        </div>
+
+        <div id="step-3" class="p-3 bg-[#08080a] border border-white/[0.06] rounded-xl space-y-1 transition-all opacity-50">
+          <div class="flex items-center space-x-1.5 text-zinc-400 font-semibold">
+            <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+            <span>3. Protocol Extraction</span>
+          </div>
+          <p class="text-[11px] text-zinc-400">Token ratio, /llms.txt, Schema.org</p>
+        </div>
+
+        <div id="step-4" class="p-3 bg-[#08080a] border border-white/[0.06] rounded-xl space-y-1 transition-all opacity-50">
+          <div class="flex items-center space-x-1.5 text-zinc-400 font-semibold">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+            <span>4. Model Reasoning</span>
+          </div>
+          <p class="text-[11px] text-zinc-400" id="step4ModelLabel">Tactical advice via active engine</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error Remediation Dialog / Banner -->
+    <div id="errorRemediationDialog" class="hidden bg-rose-950/20 border border-rose-500/30 rounded-2xl p-6 space-y-4 shadow-2xl">
+      <div class="flex items-start justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
+            <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-rose-300" id="errorTitle">Action Could Not Be Completed</h3>
+            <p class="text-xs text-rose-400/80 font-mono mt-0.5" id="errorMessage">Detailed error message</p>
+          </div>
+        </div>
+        <button onclick="dismissErrorDialog()" class="text-zinc-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="bg-[#08080a] border border-white/[0.06] rounded-xl p-4 space-y-2 text-xs">
+        <span class="font-semibold text-white flex items-center space-x-1.5">
+          <i data-lucide="life-buoy" class="w-3.5 h-3.5 text-blue-400"></i>
+          <span>How to Solve This:</span>
+        </span>
+        <ul class="space-y-1.5 text-zinc-300 pl-4 list-disc leading-relaxed" id="errorRemediationSteps">
+          <li>Verify the URL is publicly reachable and includes the protocol (e.g. <code class="text-zinc-200">https://</code>).</li>
+          <li>If the website is protected by Cloudflare or strict anti-bot security, use our <strong>Cloudflare Deobfuscator</strong> or apply verified bot WAF rules.</li>
+          <li>Uncheck "Set-of-Mark Coordinate Grounding" to run a lightweight text/DOM-only audit without screenshot overhead.</li>
+        </ul>
+      </div>
+
+      <div class="flex items-center justify-end space-x-2 pt-1">
+        <button onclick="dismissErrorDialog()" class="px-3.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-xs font-medium text-zinc-300 hover:text-white transition-all">
+          Dismiss
+        </button>
+        <button onclick="retryLastAction()" class="px-4 py-1.5 rounded-lg bg-white hover:bg-zinc-200 text-black font-semibold text-xs transition-all flex items-center space-x-1.5 shadow-sm">
+          <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+          <span>Retry Action</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Audit Workspace -->
+    <div id="resultsContainer" class="space-y-6">
+
+      <!-- Executive Telemetry HUD -->
+      <div class="bg-zinc-925 border border-white/[0.08] rounded-2xl p-5 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-6 shadow-xl">
+        
+        <!-- Score & Status -->
+        <div class="flex items-center space-x-5 min-w-[320px]">
+          <div class="flex items-baseline space-x-1.5">
+            <span id="scoreDisplay" class="text-5xl font-extrabold tracking-tight text-white font-mono">--</span>
+            <span class="text-sm font-mono text-zinc-500">/ 100</span>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span id="gradeBadge" class="px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-zinc-850 border border-white/10 text-white font-mono">Grade --</span>
+              <span id="targetUrlPill" class="text-xs font-mono text-zinc-400 truncate max-w-[200px]">--</span>
+            </div>
+            <p id="statusHeadline" class="text-xs text-zinc-400 mt-1 truncate max-w-sm">Awaiting target audit</p>
+            <!-- Domain Evolution Progression Banner -->
+            <div id="progressionBanner" class="hidden flex items-center space-x-2 mt-1.5">
+              <span id="progressionDeltaPill" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 flex items-center space-x-1">
+                <i data-lucide="trending-up" class="w-3 h-3"></i>
+                <span id="progressionDeltaText">+0.0 pts</span>
+              </span>
+              <span id="progressionRunsText" class="text-[10px] text-zinc-400 font-mono">Run #1</span>
+              <button type="button" onclick="toggleDrawer('historyDrawer')" class="text-[10px] text-blue-400 hover:text-blue-300 font-mono underline ml-1 cursor-pointer">History</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 Foundation Track Telemetry (Segmented Horizontal Meters) -->
+        <div class="flex-1 grid grid-cols-2 lg:grid-cols-4 gap-3">
+          
+          <!-- Pillar A: Citability -->
+          <div class="bg-[#08080a] border border-white/[0.06] rounded-xl p-3.5 space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-zinc-400 font-medium">Citability</span>
+              <span id="scorePillarA" class="font-mono font-semibold text-white">-- / 25</span>
+            </div>
+            <div class="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+              <div id="barPillarA" class="bg-blue-400 h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-[11px] text-zinc-500 font-mono pt-0.5">
+              <span>Density: <strong id="factDensityVal" class="text-zinc-300 font-normal">--%</strong></span>
+              <span id="capsuleVal">--</span>
+            </div>
+          </div>
+
+          <!-- Pillar B: Navigability -->
+          <div class="bg-[#08080a] border border-white/[0.06] rounded-xl p-3.5 space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-zinc-400 font-medium">Navigability</span>
+              <span id="scorePillarB" class="font-mono font-semibold text-white">-- / 25</span>
+            </div>
+            <div class="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+              <div id="barPillarB" class="bg-emerald-400 h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-[11px] text-zinc-500 font-mono pt-0.5">
+              <span>Token: <strong id="tokenRatioVal" class="text-zinc-300 font-normal">--%</strong></span>
+              <span>Traps: <strong id="trapsCountVal" class="text-zinc-300 font-normal">0</strong></span>
+            </div>
+          </div>
+
+          <!-- Pillar C: Machine Protocols -->
+          <div class="bg-[#08080a] border border-white/[0.06] rounded-xl p-3.5 space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-zinc-400 font-medium">Protocols</span>
+              <span id="scorePillarC" class="font-mono font-semibold text-white">-- / 25</span>
+            </div>
+            <div class="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+              <div id="barPillarC" class="bg-amber-400 h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-[11px] text-zinc-500 font-mono pt-0.5">
+              <span>llms.txt: <strong id="llmsTxtVal" class="text-zinc-300 font-normal">--</strong></span>
+              <span id="robotsVal">--</span>
+            </div>
+          </div>
+
+          <!-- Pillar D: Structured Data -->
+          <div class="bg-[#08080a] border border-white/[0.06] rounded-xl p-3.5 space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-zinc-400 font-medium">Structured Data</span>
+              <span id="scorePillarD" class="font-mono font-semibold text-white">-- / 25</span>
+            </div>
+            <div class="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+              <div id="barPillarD" class="bg-purple-400 h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-[11px] text-zinc-500 font-mono pt-0.5">
+              <span>Schemas: <strong id="schemaCountVal" class="text-zinc-300 font-normal">0</strong></span>
+              <span id="webmcpVal">None</span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Main Split Studio: Visual Grounding vs Machine Handshake -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Left: Visual Perception & Set-of-Mark Grounding (7 cols) -->
+        <div class="lg:col-span-7 space-y-4">
+          <div class="bg-zinc-925 border border-white/[0.08] rounded-2xl p-5 space-y-4 shadow-xl">
+            
+            <!-- Viewport Toolbar -->
+            <div class="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+              <div class="flex items-center space-x-2">
+                <span class="text-xs font-semibold text-white tracking-tight">Visual Agent Perception</span>
+                <span id="marksBadgeCount" class="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-white/5">0 grounded elements</span>
+              </div>
+
+              <div class="flex items-center space-x-2">
+                <button onclick="toggleVisualBadges()" id="toggleBadgesBtn" class="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-xs font-medium rounded-lg text-zinc-300 hover:text-white transition-all flex items-center space-x-1">
+                  <i data-lucide="eye" class="w-3 h-3"></i>
+                  <span>Toggle Badges</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Device Frame & Screenshot Canvas with Interactive Pin -->
+            <div id="screenshotViewport" class="bg-[#050507] border border-white/[0.08] rounded-xl overflow-hidden flex flex-col shadow-2xl relative group">
+              <!-- Browser Window Chrome -->
+              <div class="px-4 py-2.5 bg-[#0e0e13] border-b border-white/[0.06] flex items-center justify-between text-xs select-none">
+                <div class="flex items-center space-x-2">
+                  <div class="flex items-center space-x-1.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-zinc-700"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-zinc-700"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-zinc-700"></span>
+                  </div>
+                  <span class="text-zinc-600 font-mono text-[10px] pl-2">1280 × 800</span>
+                </div>
+                <div class="px-3 py-0.5 rounded-md bg-[#08080a] border border-white/[0.06] text-zinc-400 font-mono text-[11px] truncate max-w-xs" id="viewportUrlPill">
+                  https://docs.python.org
+                </div>
+                <div class="flex items-center space-x-1 text-zinc-500 font-mono text-[10px]">
+                  <span>Stealth Session</span>
+                </div>
+              </div>
+
+              <!-- Viewport Content -->
+              <div class="p-3 flex flex-col items-center justify-center min-h-[460px] overflow-hidden relative">
+                <div id="screenshotEmpty" class="text-center text-zinc-600 text-xs py-20 space-y-2">
+                  <i data-lucide="monitor" class="w-8 h-8 mx-auto stroke-1 text-zinc-700"></i>
+                  <p>Run an audit to render the Set-of-Mark coordinate view.</p>
+                </div>
+                <div class="relative inline-block max-w-full">
+                  <img id="screenshotImg" src="" alt="Set-of-Mark Grounding" class="hidden rounded border border-white/10 max-h-[580px] w-auto object-contain shadow-2xl transition-all">
+                  <!-- Interactive Coordinate Highlight Pin (Appears on Hover) -->
+                  <div id="coordinateHighlightPin" class="coordinate-highlight-pin hidden"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- On-Device Meta Llama 3.2 Tactical Navigation Plan -->
+            <div class="bg-[#08080a] border border-white/[0.06] rounded-xl p-4 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2 text-zinc-300">
+                  <span class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span>
+                  <span class="text-xs font-semibold text-white">Meta Llama 3.2 Tactical Agent Plan</span>
+                </div>
+                <button onclick="copyAgentAdvice()" class="text-xs text-zinc-400 hover:text-white flex items-center space-x-1 transition-all">
+                  <i data-lucide="copy" class="w-3 h-3"></i>
+                  <span id="copyAdviceLabel">Copy</span>
+                </button>
+              </div>
+              <p id="agentAdviceText" class="text-xs text-zinc-300 leading-relaxed font-mono bg-zinc-925 p-3 rounded-lg border border-white/5">
+                Awaiting audit execution...
+              </p>
+            </div>
+
+            <!-- Grounded Interactive Elements Scroll List with Cross-Highlighting -->
+            <div class="bg-[#08080a] border border-white/[0.06] rounded-xl p-4 space-y-2">
+              <div class="flex items-center justify-between text-xs pb-1.5 border-b border-white/[0.06]">
+                <span class="font-medium text-zinc-300">Grounded Interactive Landmarks</span>
+                <span class="text-[11px] text-zinc-500 font-mono">Hover row to pin coordinate</span>
+              </div>
+              <div id="interactiveMarksScroll" class="overflow-y-auto max-h-[180px] space-y-1 pr-1 text-xs">
+                <p class="text-zinc-600 text-xs py-3 text-center">No interactive marks loaded.</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Right: Handshake Studio, Patcher & Recommendations (5 cols) -->
+        <div id="handshakeSection" class="lg:col-span-5 space-y-4">
+          <div class="bg-zinc-925 border border-white/[0.08] rounded-2xl p-5 space-y-4 shadow-xl">
+            
+            <!-- Handshake Tabs Header -->
+            <div class="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+              <span class="text-xs font-semibold text-white tracking-tight">Machine-to-Machine Handshake</span>
+              
+              <div class="flex items-center space-x-1.5">
+                <button onclick="copyActiveHandshakeFile()" class="p-1.5 bg-zinc-900 hover:bg-zinc-800 border border-white/10 rounded-lg text-zinc-300 hover:text-white transition-all" title="Copy active code">
+                  <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="downloadActiveHandshakeFile()" class="p-1.5 bg-zinc-900 hover:bg-zinc-800 border border-white/10 rounded-lg text-zinc-300 hover:text-white transition-all" title="Download active file">
+                  <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Smooth Horizontal Segmented Subtabs (No Wrap) -->
+            <div class="overflow-x-auto no-scrollbar pb-1">
+              <div class="inline-flex p-1 rounded-xl bg-[#08080a] border border-white/[0.06] text-[11px] font-mono whitespace-nowrap">
+                <button onclick="switchHandshakeTab('recommendations')" id="hTab-recommendations" class="px-2.5 py-1 rounded-lg segment-tab-active transition-all">Recommendations</button>
+                <button onclick="switchHandshakeTab('agent_spec')" id="hTab-agent_spec" class="px-2.5 py-1 rounded-lg segment-tab-inactive transition-all">agent-spec.json</button>
+                <button onclick="switchHandshakeTab('llms_txt')" id="hTab-llms_txt" class="px-2.5 py-1 rounded-lg segment-tab-inactive transition-all">llms.txt</button>
+                <button onclick="switchHandshakeTab('schema_jsonld')" id="hTab-schema_jsonld" class="px-2.5 py-1 rounded-lg segment-tab-inactive transition-all">schema.jsonld</button>
+                <button onclick="switchHandshakeTab('waf_rules')" id="hTab-waf_rules" class="px-2.5 py-1 rounded-lg segment-tab-inactive transition-all">Cloudflare WAF</button>
+                <button onclick="switchHandshakeTab('blockers')" id="hTab-blockers" class="px-2.5 py-1 rounded-lg segment-tab-inactive transition-all">Blockers</button>
+              </div>
+            </div>
+
+            <!-- Content Area: Recommendations, Code, WAF, or Blockers -->
+            <div class="relative">
+              
+              <!-- 1. Recommendations & Score Simulator View -->
+              <div id="recommendationsView" class="space-y-3.5 max-h-[460px] overflow-y-auto pr-1">
+                
+                <!-- Roadmap to 100 Executive Header Card -->
+                <div class="p-4 bg-[#08080a] border border-white/[0.07] rounded-xl space-y-3 shadow-sm">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="flex items-center space-x-2">
+                        <span class="text-xs font-semibold text-white tracking-tight">Roadmap to 100</span>
+                        <span id="potentialDeltaPill" class="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">+0.0 pts boost</span>
+                      </div>
+                      <p class="text-[11px] text-zinc-400 mt-0.5">Autonomous optimization roadmap to achieve 90+ agentic citability</p>
+                    </div>
+                    <button type="button" onclick="openSelfHealingPatcherModal()" id="applyAllRecsBtn" class="px-3 py-1.5 bg-white hover:bg-zinc-200 text-black text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 shadow-sm" title="Apply all AEO fixes directly to repository">
+                      <i data-lucide="wand-2" class="w-3.5 h-3.5"></i>
+                      <span>Apply Fixes</span>
+                    </button>
+                  </div>
+
+                  <!-- Score Trajectory Counter -->
+                  <div class="flex items-center justify-between text-xs pt-1 border-t border-white/[0.05]">
+                    <div class="flex items-baseline space-x-1.5">
+                      <span class="text-zinc-500 font-mono text-[11px]">Current:</span>
+                      <span id="currentSimScore" class="font-mono font-semibold text-zinc-300">--</span>
+                    </div>
+                    <span class="text-zinc-600 font-mono text-xs">➔</span>
+                    <div class="flex items-baseline space-x-2">
+                      <span class="text-zinc-500 font-mono text-[11px]">Simulated Target:</span>
+                      <span id="potentialSimScore" class="font-mono font-bold text-emerald-400">-- / 100</span>
+                      <span id="potentialGradeBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">Grade A</span>
+                    </div>
+                  </div>
+
+                  <!-- Dual-Layer Score Progression Track -->
+                  <div class="space-y-1">
+                    <div class="w-full bg-zinc-900 rounded-full h-2 overflow-hidden flex">
+                      <div id="recProgressBarCurrent" class="bg-zinc-500 h-2 transition-all duration-500" style="width: 0%"></div>
+                      <div id="recProgressBarBoost" class="bg-emerald-500 h-2 transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                    <div class="flex justify-between text-[10px] text-zinc-500 font-mono">
+                      <span>0</span>
+                      <span>60 (Fair)</span>
+                      <span>75 (Good)</span>
+                      <span>90 (AI-Ready)</span>
+                      <span class="text-emerald-400 font-bold">100</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Recommendation Category Filter Pills -->
+                <div class="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-0.5 text-[11px] font-mono" id="recFiltersContainer">
+                  <button type="button" onclick="filterRecommendations('all')" class="rec-filter-btn px-2.5 py-1 rounded-md segment-tab-active" data-cat="all">All (<span id="recFilterAllCount">0</span>)</button>
+                  <button type="button" onclick="filterRecommendations('Machine Protocols')" class="rec-filter-btn px-2.5 py-1 rounded-md segment-tab-inactive" data-cat="Machine Protocols">Protocols</button>
+                  <button type="button" onclick="filterRecommendations('Citability & AEO')" class="rec-filter-btn px-2.5 py-1 rounded-md segment-tab-inactive" data-cat="Citability & AEO">Citability</button>
+                  <button type="button" onclick="filterRecommendations('Structured Data')" class="rec-filter-btn px-2.5 py-1 rounded-md segment-tab-inactive" data-cat="Structured Data">Schema</button>
+                  <button type="button" onclick="filterRecommendations('DOM & Navigability')" class="rec-filter-btn px-2.5 py-1 rounded-md segment-tab-inactive" data-cat="DOM & Navigability">Navigability</button>
+                  <button type="button" onclick="filterRecommendations('WAF & Security')" class="rec-filter-btn px-2.5 py-1 rounded-md segment-tab-inactive" data-cat="WAF & Security">Security</button>
+                </div>
+
+                <div id="recommendationsList" class="space-y-2 text-xs">
+                  <p class="text-zinc-600 text-xs py-4 text-center">Run an audit to generate prioritized recommendations.</p>
+                </div>
+              </div>
+
+              <!-- 2. Standard Code Viewer (agent-spec, llms.txt, schema) -->
+              <pre id="handshakeCodeView" class="hidden code-surface p-4 overflow-x-auto max-h-[380px] text-xs"><code>// Run an audit to generate machine-to-machine handshake specifications.</code></pre>
+
+              <!-- 3. Cloudflare WAF AI Bot Allow Rules -->
+              <div id="wafRulesView" class="hidden space-y-3 max-h-[380px] overflow-y-auto">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-zinc-400">Allow Verified AI Bots (Meta, Perplexity, GPTBot)</span>
+                  <button onclick="copyWafConfig()" class="text-xs text-zinc-300 hover:text-white flex items-center space-x-1 font-mono">
+                    <i data-lucide="copy" class="w-3 h-3"></i>
+                    <span>Copy Rule</span>
+                  </button>
+                </div>
+                <pre id="wafCodeView" class="code-surface p-3 overflow-x-auto text-xs text-emerald-300"><code>// Cloudflare WAF allow rule expression will appear here after audit.</code></pre>
+              </div>
+
+              <!-- 4. Blockers View -->
+              <div id="blockersView" class="hidden space-y-3 p-4 bg-[#08080a] border border-white/[0.06] rounded-xl max-h-[380px] overflow-y-auto text-xs">
+                <div>
+                  <h4 class="font-semibold text-rose-400 flex items-center space-x-1.5 mb-2">
+                    <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+                    <span>Critical Agent Blockers</span>
+                  </h4>
+                  <ul id="blockersUl" class="space-y-1.5 text-zinc-400 pl-4 list-disc">
+                    <li>None detected.</li>
+                  </ul>
+                </div>
+
+                <div class="pt-3 border-t border-white/[0.06]">
+                  <h4 class="font-semibold text-emerald-400 flex items-center space-x-1.5 mb-2">
+                    <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+                    <span>Verified Agentic Strengths</span>
+                  </h4>
+                  <ul id="strengthsUl" class="space-y-1.5 text-zinc-400 pl-4 list-disc">
+                    <li>Awaiting audit...</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- 1-Click Codebase Patcher Utility -->
+            <div class="bg-[#08080a] border border-white/[0.06] rounded-xl p-4 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-white flex items-center space-x-1.5">
+                  <i data-lucide="wand-2" class="w-3.5 h-3.5 text-blue-400"></i>
+                  <span>1-Click Codebase AST Patch</span>
+                </span>
+                <span class="text-[10px] text-zinc-500 font-mono">Self-Healing</span>
+              </div>
+              <p class="text-xs text-zinc-400">Injects <code class="text-zinc-200 font-mono">llms.txt</code>, <code class="text-zinc-200 font-mono">agent-spec.json</code>, and Schema.org tags directly into your repository.</p>
+              
+              <form onsubmit="handlePatchSubmit(event)" class="flex gap-2">
+                <input 
+                  type="text" 
+                  id="patchTargetDirInput" 
+                  value="." 
+                  placeholder="Local repo path (e.g. .)" 
+                  class="flex-1 px-3 py-2 bg-zinc-925 border border-white/10 rounded-lg text-xs text-white font-mono outline-none"
+                >
+                <button type="submit" id="patchSubmitBtn" class="px-3.5 py-2 bg-white hover:bg-zinc-200 text-black font-semibold text-xs rounded-lg transition-all whitespace-nowrap">
+                  Apply Patch
+                </button>
+              </form>
+
+              <div id="patchFeedback" class="hidden text-xs font-mono p-2.5 bg-zinc-925 border border-emerald-500/30 rounded-lg text-emerald-400"></div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- DRAWER 1: Sitewide BFS Crawler -->
+  <div id="crawlerDrawer" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 drawer-backdrop" onclick="toggleDrawer('crawlerDrawer')"></div>
+    <div class="absolute right-0 top-0 bottom-0 w-full max-w-xl bg-zinc-925 border-l border-white/10 p-6 flex flex-col space-y-5 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+        <h3 class="text-sm font-semibold text-white flex items-center space-x-2">
+          <i data-lucide="network" class="w-4 h-4 text-blue-400"></i>
+          <span>Sitewide Multi-Page BFS Crawler</span>
+        </h3>
+        <button onclick="toggleDrawer('crawlerDrawer')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <form onsubmit="handleCrawlSubmit(event)" class="space-y-3">
+        <div>
+          <label class="block text-xs text-zinc-400 mb-1">Target Base URL</label>
+          <input type="text" id="crawlUrlInput" required value="https://docs.python.org" class="w-full px-3 py-2 bg-[#08080a] border border-white/10 rounded-lg text-xs text-white font-mono outline-none">
+        </div>
+        <div>
+          <label class="block text-xs text-zinc-400 mb-1">Max Pages to Traverse</label>
+          <input type="number" id="crawlMaxPagesInput" min="1" max="10" value="3" class="w-full px-3 py-2 bg-[#08080a] border border-white/10 rounded-lg text-xs text-white font-mono outline-none">
+        </div>
+        <button type="submit" id="crawlSubmitBtn" class="w-full py-2 bg-white hover:bg-zinc-200 text-black font-semibold text-xs rounded-lg transition-all">
+          Execute BFS Crawl
+        </button>
+      </form>
+
+      <div id="crawlResults" class="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
+        <p class="text-zinc-600 text-center py-10">Configure and run a crawl to evaluate sitewide AEO graph.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- DRAWER 2: Cloudflare Deobfuscator -->
+  <div id="deobfuscatorDrawer" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 drawer-backdrop" onclick="toggleDrawer('deobfuscatorDrawer')"></div>
+    <div class="absolute right-0 top-0 bottom-0 w-full max-w-xl bg-zinc-925 border-l border-white/10 p-6 flex flex-col space-y-5 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+        <h3 class="text-sm font-semibold text-white flex items-center space-x-2">
+          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+          <span>Cloudflare XOR Email Deobfuscator</span>
+        </h3>
+        <button onclick="toggleDrawer('deobfuscatorDrawer')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <p class="text-xs text-zinc-400">Decodes Cloudflare email protection tokens (<code class="text-zinc-200 font-mono">data-cfemail</code>) allowing AI web agents to access contact and support endpoints.</p>
+
+      <form onsubmit="handleDeobfuscateSubmit(event)" class="space-y-3">
+        <div>
+          <label class="block text-xs text-zinc-400 mb-1">Cloudflare Hex Token (data-cfemail)</label>
+          <input type="text" id="deobfuscateHexInput" placeholder="e.g. 523b373f33123b3372333f37" class="w-full px-3 py-2 bg-[#08080a] border border-white/10 rounded-lg text-xs text-white font-mono outline-none">
+        </div>
+        <button type="submit" class="w-full py-2 bg-white hover:bg-zinc-200 text-black font-semibold text-xs rounded-lg transition-all">
+          Deobfuscate XOR Token
+        </button>
+      </form>
+
+      <div id="deobfuscateResult" class="hidden p-4 bg-[#08080a] border border-white/10 rounded-xl space-y-2 text-xs">
+        <span class="text-zinc-500 font-mono">Decoded Output:</span>
+        <p id="deobfuscateOutputText" class="font-mono text-sm text-emerald-400 font-bold select-all"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- DRAWER 3: MCP Tools Hub -->
+  <div id="mcpDrawer" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 drawer-backdrop" onclick="toggleDrawer('mcpDrawer')"></div>
+    <div class="absolute right-0 top-0 bottom-0 w-full max-w-xl bg-zinc-925 border-l border-white/10 p-6 flex flex-col space-y-5 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+        <h3 class="text-sm font-semibold text-white flex items-center space-x-2">
+          <i data-lucide="cpu" class="w-4 h-4 text-purple-400"></i>
+          <span>Model Context Protocol (MCP) Tools</span>
+        </h3>
+        <button onclick="toggleDrawer('mcpDrawer')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <p class="text-xs text-zinc-400">Exposes AEOForge natively to Claude Desktop, Cursor, Windsurf, and custom AI agents via standard MCP protocol.</p>
+
+      <div class="space-y-3 text-xs">
+        <div class="p-3 bg-[#08080a] border border-white/5 rounded-xl space-y-1">
+          <span class="font-mono font-semibold text-white">aeo_audit_page</span>
+          <p class="text-zinc-400 text-[11px]">Inspects any URL, calculates citability, and detects blocker traps.</p>
+        </div>
+        <div class="p-3 bg-[#08080a] border border-white/5 rounded-xl space-y-1">
+          <span class="font-mono font-semibold text-white">aeo_generate_spec</span>
+          <p class="text-zinc-400 text-[11px]">Generates machine handshake JSON schema and /llms.txt.</p>
+        </div>
+        <div class="p-3 bg-[#08080a] border border-white/5 rounded-xl space-y-1">
+          <span class="font-mono font-semibold text-white">aeo_patch_codebase</span>
+          <p class="text-zinc-400 text-[11px]">Injects missing specs directly into repository AST.</p>
+        </div>
+      </div>
+
+      <div class="space-y-2 pt-2">
+        <span class="text-xs text-zinc-400">Launch Local MCP Server:</span>
+        <pre class="code-surface p-3 text-xs font-mono text-zinc-300">python -m aeoforge.mcp_server</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- DRAWER 4: Head-to-Head Competitor Outranking Studio -->
+  <div id="compareDrawer" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 drawer-backdrop" onclick="toggleDrawer('compareDrawer')"></div>
+    <div class="absolute right-0 top-0 bottom-0 w-full max-w-2xl bg-zinc-925 border-l border-white/10 p-6 flex flex-col space-y-5 shadow-2xl overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+        <h3 class="text-sm font-semibold text-white flex items-center space-x-2">
+          <i data-lucide="git-compare" class="w-4 h-4 text-blue-400"></i>
+          <span>Competitor Head-to-Head Outranking Lab</span>
+        </h3>
+        <button onclick="toggleDrawer('compareDrawer')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <p class="text-xs text-zinc-400">Audits two domains simultaneously in parallel stealth sessions. Synthesizes an exact AEO Outranking Blueprint explaining why Answer Engines favor one over the other.</p>
+
+      <form onsubmit="handleCompareSubmit(event)" class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs text-zinc-400 mb-1">Your Domain (Target)</label>
+            <input type="text" id="compareTargetInput" required value="docs.python.org" class="w-full px-3 py-2 bg-[#08080a] border border-white/10 rounded-lg text-xs text-white font-mono outline-none">
+          </div>
+          <div>
+            <label class="block text-xs text-zinc-400 mb-1">Competitor Domain</label>
+            <input type="text" id="compareCompetitorInput" required placeholder="e.g. rust-lang.org" class="w-full px-3 py-2 bg-[#08080a] border border-white/10 rounded-lg text-xs text-white font-mono outline-none">
+          </div>
+        </div>
+        <button type="submit" id="compareSubmitBtn" class="w-full py-2.5 bg-white hover:bg-zinc-200 text-black font-semibold text-xs rounded-xl transition-all shadow-sm">
+          Run Head-to-Head Comparison
+        </button>
+      </form>
+
+      <div id="compareLoading" class="hidden text-center py-10 space-y-3">
+        <div class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/5 text-white animate-spin">
+          <i data-lucide="loader" class="w-4 h-4"></i>
+        </div>
+        <p class="text-xs text-zinc-400 font-mono">Running dual headless Playwright audits in parallel...</p>
+      </div>
+
+      <div id="compareResults" class="hidden space-y-4 text-xs">
+        <!-- Dual Score Card -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="p-3.5 bg-[#08080a] border border-white/5 rounded-xl space-y-1">
+            <span class="text-[11px] font-mono text-zinc-400">Target domain</span>
+            <div id="compareTargetScore" class="text-xl font-bold font-mono text-white">--</div>
+            <p id="compareTargetUrl" class="text-[11px] font-mono text-zinc-400 truncate"></p>
+          </div>
+          <div class="p-3.5 bg-[#08080a] border border-white/5 rounded-xl space-y-1">
+            <span class="text-[11px] font-mono text-zinc-400">Competitor domain</span>
+            <div id="compareCompetitorScore" class="text-xl font-bold font-mono text-white">--</div>
+            <p id="compareCompetitorUrl" class="text-[11px] font-mono text-zinc-400 truncate"></p>
+          </div>
+        </div>
+
+        <!-- Telemetry Delta Table -->
+        <div class="border border-white/5 rounded-xl overflow-hidden">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-zinc-900 border-b border-white/5 text-zinc-400 font-mono text-[10px]">
+                <th class="p-2.5">Metric</th>
+                <th class="p-2.5">Target</th>
+                <th class="p-2.5">Competitor</th>
+                <th class="p-2.5">Delta</th>
+              </tr>
+            </thead>
+            <tbody id="compareMetricsTbody" class="divide-y divide-white/5 font-mono">
+            </tbody>
+          </table>
+        </div>
+
+        <!-- AEO Outranking Blueprint -->
+        <div class="p-4 bg-[#08080a] border border-white/5 rounded-xl space-y-2">
+          <h4 class="font-semibold text-white flex items-center space-x-1.5">
+            <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+            <span>AEO Outranking Blueprint</span>
+          </h4>
+          <ul id="compareBlueprintUl" class="space-y-1.5 text-zinc-300 pl-4 list-disc leading-relaxed text-xs">
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DRAWER: Persistent Audit History & Progression Lab -->
+  <div id="historyDrawer" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 drawer-backdrop" onclick="toggleDrawer('historyDrawer')"></div>
+    <div class="absolute right-0 top-0 bottom-0 w-full max-w-xl bg-zinc-925 border-l border-white/10 p-6 flex flex-col space-y-4 shadow-2xl">
+      
+      <!-- Drawer Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+            <i data-lucide="history" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-white tracking-tight">Audit History & Progression Lab</h3>
+            <p class="text-[11px] text-zinc-400 font-mono">Persistent SQLite database snapshots & score deltas</p>
+          </div>
+        </div>
+        
+        <div class="flex items-center space-x-2">
+          <button type="button" onclick="clearAuditHistory()" class="px-2.5 py-1 text-[11px] font-mono text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-rose-500/20 rounded-lg transition-all" title="Clear all saved audit history">
+            Clear All
+          </button>
+          <button type="button" onclick="toggleDrawer('historyDrawer')" class="text-zinc-400 hover:text-white p-1">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Domain Progression Trajectory Card -->
+      <div id="historyProgressionCard" class="hidden p-4 bg-[#08080a] border border-white/[0.06] rounded-xl space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="text-[11px] font-mono text-zinc-400">Domain progression trajectory</span>
+            <h4 id="progDomainLabel" class="text-xs font-bold text-white font-mono mt-0.5">--</h4>
+          </div>
+          <div class="text-right">
+            <span id="progNetDeltaBadge" class="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">+0.0 pts</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 text-center font-mono">
+          <div class="p-2 bg-zinc-900 rounded-lg border border-white/5">
+            <span class="text-[10px] text-zinc-500 block">Baseline Score</span>
+            <span id="progInitialScore" class="text-xs font-bold text-zinc-300">--</span>
+          </div>
+          <div class="p-2 bg-zinc-900 rounded-lg border border-white/5">
+            <span class="text-[10px] text-zinc-500 block">Latest Score</span>
+            <span id="progLatestScore" class="text-xs font-bold text-emerald-400">--</span>
+          </div>
+          <div class="p-2 bg-zinc-900 rounded-lg border border-white/5">
+            <span class="text-[10px] text-zinc-500 block">Total Audits</span>
+            <span id="progAuditCount" class="text-xs font-bold text-white">0</span>
+          </div>
+        </div>
+
+        <!-- Step Progression Timeline -->
+        <div class="space-y-1.5 pt-1">
+          <span class="text-[10px] text-zinc-500 font-mono">Evolution Timeline:</span>
+          <div id="progTimelineSteps" class="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-1"></div>
+        </div>
+      </div>
+
+      <!-- History Feed Filter & Search -->
+      <div class="flex items-center space-x-2">
+        <div class="relative flex-1">
+          <input type="text" id="historySearchInput" oninput="filterHistoryList(this.value)" placeholder="Filter history by domain..." class="w-full px-3 py-1.5 pl-8 bg-[#08080a] border border-white/10 rounded-lg text-xs text-white font-mono outline-none">
+          <i data-lucide="search" class="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-2.5"></i>
+        </div>
+        <button type="button" onclick="refreshHistoryFeed()" class="p-1.5 bg-zinc-900 hover:bg-zinc-800 border border-white/10 rounded-lg text-zinc-300 hover:text-white transition-all" title="Refresh history">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+
+      <!-- History Snapshots Feed Container -->
+      <div id="historyListContainer" class="flex-1 overflow-y-auto space-y-2.5 pr-1 text-xs">
+        <p class="text-zinc-600 text-center py-12">No audits recorded yet in persistent storage.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL: Technical Control Center & AI Engine Settings -->
+  <div id="modelSettingsModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 drawer-backdrop" onclick="closeModelSettingsModal()"></div>
+    <div class="relative w-full max-w-xl bg-zinc-925 border border-white/10 rounded-2xl p-6 shadow-2xl space-y-5 z-10">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+            <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-white tracking-tight">Technical Control Center & AI Engine</h3>
+            <p class="text-xs text-zinc-400 font-mono">Configure AI models, API keys, codebase patcher, and crawler bypass</p>
+          </div>
+        </div>
+        <button onclick="closeModelSettingsModal()" class="text-zinc-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Active Status Strip -->
+      <div class="p-3 bg-[#08080a] border border-white/[0.06] rounded-xl flex items-center justify-between text-xs">
+        <div class="flex items-center space-x-2">
+          <span class="text-zinc-400 font-medium">Active Engine:</span>
+          <span id="modalActiveModelPill" class="font-mono font-semibold text-emerald-400 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">llama3.2:latest</span>
+        </div>
+        <span id="modalActiveProviderPill" class="text-[11px] font-mono text-zinc-400">On-Device Ollama</span>
+      </div>
+
+      <!-- Provider & Technical Tabs -->
+      <div class="p-1 rounded-xl bg-[#08080a] border border-white/[0.06] flex text-[11px] font-mono overflow-x-auto no-scrollbar whitespace-nowrap">
+        <button type="button" onclick="switchModelTab('ollama')" id="mTab-ollama" class="flex-1 px-2.5 py-1.5 rounded-lg segment-tab-active transition-all">
+          Local Ollama
+        </button>
+        <button type="button" onclick="switchModelTab('cloud')" id="mTab-cloud" class="flex-1 px-2.5 py-1.5 rounded-lg segment-tab-inactive transition-all">
+          Cloud APIs & Keys
+        </button>
+        <button type="button" onclick="switchModelTab('patcher')" id="mTab-patcher" class="flex-1 px-2.5 py-1.5 rounded-lg segment-tab-inactive transition-all">
+          Codebase Patcher
+        </button>
+        <button type="button" onclick="switchModelTab('crawler')" id="mTab-crawler" class="flex-1 px-2.5 py-1.5 rounded-lg segment-tab-inactive transition-all">
+          Crawler & Shields
+        </button>
+        <button type="button" onclick="switchModelTab('preferences')" id="mTab-preferences" class="flex-1 px-2.5 py-1.5 rounded-lg segment-tab-inactive transition-all">
+          Theme & A11y
+        </button>
+      </div>
+
+      <!-- VIEW 1: On-Device Ollama Settings -->
+      <div id="mView-ollama" class="space-y-3.5 text-xs">
+        <div>
+          <label class="block text-zinc-400 mb-1">Local Model Name</label>
+          <div class="flex gap-2">
+            <select id="ollamaModelSelect" class="flex-1 px-3 py-2 bg-[#08080a] border border-white/10 rounded-lg text-white font-mono outline-none">
+              <option value="llama3.2:latest">llama3.2:latest (Meta Llama 3.2 3B)</option>
+            </select>
+            <button type="button" onclick="scanLocalOllamaModels()" class="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-zinc-300 hover:text-white rounded-lg transition-all flex items-center space-x-1" title="Scan installed models">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              <span>Scan</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-zinc-400 mb-1">Ollama Server Endpoint</label>
+          <input type="text" id="ollamaEndpointInput" value="http://localhost:11434" class="w-full px-3 py-2 bg-[#08080a] border border-white/10 rounded-lg text-white font-mono outline-none">
+        </div>
+
+        <div class="p-3 bg-zinc-900/60 border border-white/[0.04] rounded-xl text-zinc-400 leading-relaxed text-[11px]">
+          <span class="text-white font-semibold">Zero-Cost Local Inference:</span> Runs entirely on your local Apple Silicon M4 / GPU Neural Engine. No rate limits, 100% private, 45 tokens/second.
+        </div>
+      </div>
+
+      <!-- VIEW 2: Cloud API Settings -->
+      <div id="mView-cloud" class="hidden space-y-3.5 text-xs">
+        <div>
+          <label class="block text-zinc-400 mb-1">Cloud Provider / Model Preset</label>
+          <select id="cloudPresetSelect" onchange="handleCloudPresetChange()" class="w-full px-3 py-2 bg-[#08080a] border border-white/10 rounded-lg text-white font-mono outline-none">
+            <option value="meta-llama/Llama-3.3-70B-Instruct">Meta Llama 3.3 70B (Groq / vLLM)</option>
+            <option value="meta-llama/Llama-3.2-11B-Vision-Instruct">Meta Llama 3.2 11B Vision</option>
+            <option value="meta-llama/Llama-3.2-3B-Instruct">Meta Llama 3.2 3B Instruct</option>
+            <option value="gpt-4o-mini">OpenAI GPT-4o Mini</option>
+            <option value="claude-3-5-sonnet-20241022">Anthropic Claude 3.5 Sonnet</option>
+            <option value="custom">Custom OpenAI-Compatible API</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-zinc-400 mb-1">API Key</label>
+          <div class="relative flex items-center bg-[#08080a] border border-white/10 rounded-lg px-3 py-2">
+            <input type="password" id="cloudApiKeyInput" placeholder="gsk_... or sk-..." class="w-full bg-transparent text-white font-mono outline-none pr-8">
+            <button type="button" onclick="toggleApiKeyMask()" class="text-zinc-500 hover:text-white" title="Show/hide key">
+              <i data-lucide="eye" id="eyeIcon" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-zinc-400 mb-1">API Base URL</label>
+          <input type="text" id="cloudApiBaseInput" value="https://api.groq.com/openai/v1" class="w-full px-3 py-2 bg-[#08080a] border border-white/10 rounded-lg text-white font-mono outline-none">
+        </div>
+
+        <div>
+          <label class="block text-zinc-400 mb-1">Custom Model Identifier</label>
+          <input type="text" id="cloudModelNameInput" value="meta-llama/Llama-3.3-70B-Instruct" class="w-full px-3 py-2 bg-[#08080a] border border-white/10 rounded-lg text-white font-mono outline-none">
+        </div>
+      </div>
+
+      <!-- VIEW 3: Theme & Accessibility Preferences -->
+      <div id="mView-preferences" class="hidden space-y-3.5 text-xs">
+        <div>
+          <label class="block text-zinc-400 mb-1.5 font-medium">Color Theme</label>
+          <div class="grid grid-cols-3 gap-2 font-mono text-[11px]">
+            <button type="button" onclick="setTheme('dark')" class="p-2.5 rounded-xl bg-[#08080a] border border-white/10 hover:border-white/30 text-white flex flex-col items-center space-y-1 transition-all">
+              <i data-lucide="moon" class="w-4 h-4 text-zinc-300"></i>
+              <span>Dark (Obsidian)</span>
+            </button>
+            <button type="button" onclick="setTheme('light')" class="p-2.5 rounded-xl bg-[#08080a] border border-white/10 hover:border-white/30 text-white flex flex-col items-center space-y-1 transition-all">
+              <i data-lucide="sun" class="w-4 h-4 text-amber-400"></i>
+              <span>Light (Porcelain)</span>
+            </button>
+            <button type="button" onclick="setTheme('system')" class="p-2.5 rounded-xl bg-[#08080a] border border-white/10 hover:border-white/30 text-white flex flex-col items-center space-y-1 transition-all">
+              <i data-lucide="laptop" class="w-4 h-4 text-blue-400"></i>
+              <span>System Match</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="space-y-2 pt-1 border-t border-white/[0.06]">
+          <label class="block text-zinc-400 font-medium">Accessibility & Motion (WCAG 2.1 AA)</label>
+          <div class="space-y-2">
+            <label class="flex items-center space-x-2.5 cursor-pointer">
+              <input type="checkbox" id="reduceMotionToggle" onchange="toggleReduceMotion(this.checked)" class="rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 w-3.5 h-3.5 accent-white">
+              <span class="text-zinc-300 text-[11px]">Enforce Reduced Motion (tames all animations)</span>
+            </label>
+            <label class="flex items-center space-x-2.5 cursor-pointer">
+              <input type="checkbox" id="highContrastToggle" checked class="rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 w-3.5 h-3.5 accent-white">
+              <span class="text-zinc-300 text-[11px]">Enhanced Keyboard Focus Rings (outline: 2px solid #3b82f6)</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="p-3 bg-zinc-900/60 border border-white/[0.04] rounded-xl text-zinc-400 leading-relaxed text-[11px]">
+          <span class="text-white font-semibold">AI Interoperability:</span> All AEOForge tools are queryable via standard JSON over REST (<code class="text-zinc-300">/api/v1/tools</code>) or standard Model Context Protocol (MCP) stdio.
+        </div>
+      </div>
+
+      <!-- VIEW 4: Self-Healing Codebase AST Patcher -->
+      <div id="mView-patcher" class="hidden space-y-3.5 text-xs">
+        <div class="p-3 bg-zinc-900/60 border border-white/[0.04] rounded-xl text-zinc-300 leading-relaxed text-[11px]">
+          <span class="text-white font-semibold">In-UI Self-Healing AST Injection:</span> Directly injects machine-readable specifications (<code class="text-emerald-400">/llms.txt</code>, <code class="text-blue-400">/agent-spec.json</code>, Schema.org JSON-LD) into your project repository without manual file creation or coding.
+        </div>
+
+        <div>
+          <label class="block text-zinc-400 mb-1">Target Repository Directory Path</label>
+          <input type="text" id="patchTargetDirInput" value="." class="w-full px-3 py-2 bg-[#08080a] border border-white/10 rounded-lg text-white font-mono outline-none">
+          <span class="text-[10px] text-zinc-500 font-mono mt-1 block">Enter <code class="text-zinc-300">.</code> for current workspace or an absolute path (e.g. <code class="text-zinc-300">/var/www/my-site</code>)</span>
+        </div>
+
+        <div class="space-y-2 pt-1">
+          <label class="block text-zinc-400 font-medium">Select Artifacts to Inject:</label>
+          <div class="space-y-1.5 text-zinc-300 font-mono text-[11px]">
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" id="patchLlmsTxtToggle" checked class="rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 w-3.5 h-3.5 accent-white">
+              <span>public/llms.txt & public/llms-full.txt (Autonomous AI Directory)</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" id="patchAgentSpecToggle" checked class="rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 w-3.5 h-3.5 accent-white">
+              <span>public/agent-spec.json (WebMCP Agent Machine Spec)</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" id="patchSchemaToggle" checked class="rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 w-3.5 h-3.5 accent-white">
+              <span>index.html (Schema.org JSON-LD Knowledge Graph)</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="pt-2">
+          <button type="button" onclick="executeInUiCodebasePatch()" id="runPatchBtn" class="w-full py-2.5 bg-white hover:bg-zinc-200 text-black font-semibold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center space-x-1.5">
+            <i data-lucide="hammer" class="w-3.5 h-3.5"></i>
+            <span>Run Self-Healing AST Injection</span>
+          </button>
+        </div>
+
+        <div id="patchExecutionOutput" class="hidden p-3 bg-[#08080a] border border-white/10 rounded-xl font-mono text-[11px] space-y-1"></div>
+      </div>
+
+      <!-- VIEW 5: Crawler & Anti-Block Security Settings -->
+      <div id="mView-crawler" class="hidden space-y-3.5 text-xs">
+        <div class="p-3 bg-zinc-900/60 border border-white/[0.04] rounded-xl text-zinc-300 leading-relaxed text-[11px]">
+          <span class="text-white font-semibold">Anti-Block Shield Engine:</span> Configure stealth browser automation to bypass Cloudflare Bot Fight Mode, rate limiting, and JavaScript security walls.
+        </div>
+
+        <div>
+          <label class="block text-zinc-400 mb-1">Crawler User-Agent Identity</label>
+          <select id="crawlerUserAgentSelect" class="w-full px-3 py-2 bg-[#08080a] border border-white/10 rounded-lg text-white font-mono outline-none">
+            <option value="stealth">Stealth Chrome (Bypasses Cloudflare & Vercel shields)</option>
+            <option value="meta">Meta-ExternalAgent/1.1 (Verify Meta crawler compatibility)</option>
+            <option value="perplexity">PerplexityBot/1.0 (Verify Perplexity crawler access)</option>
+            <option value="gptbot">GPTBot/1.0 (Verify OpenAI crawler access)</option>
+            <option value="googlebot">Googlebot/2.1 (Google Search crawler)</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-zinc-400 mb-1">Navigation Timeout (s)</label>
+            <input type="number" id="crawlerTimeoutInput" min="10" max="120" value="45" class="w-full px-3 py-2 bg-[#08080a] border border-white/10 rounded-lg text-white font-mono outline-none">
+          </div>
+          <div>
+            <label class="block text-zinc-400 mb-1">Max BFS Depth</label>
+            <input type="number" id="crawlerDepthInput" min="1" max="10" value="3" class="w-full px-3 py-2 bg-[#08080a] border border-white/10 rounded-lg text-white font-mono outline-none">
+          </div>
+        </div>
+
+        <div class="space-y-2 pt-1 border-t border-white/[0.06]">
+          <label class="flex items-center space-x-2.5 cursor-pointer">
+            <input type="checkbox" id="stealthModeToggle" checked class="rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 w-3.5 h-3.5 accent-white">
+            <span class="text-zinc-300 text-[11px]">Enable Chromium Stealth Evasions (navigator.webdriver mask)</span>
+          </label>
+          <label class="flex items-center space-x-2.5 cursor-pointer">
+            <input type="checkbox" id="autoSolveChallengesToggle" checked class="rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0 w-3.5 h-3.5 accent-white">
+            <span class="text-zinc-300 text-[11px]">Auto-dismiss Cookie walls and Consent Interstitials</span>
+          </label>
+        </div>
+
+        <div class="pt-2">
+          <button type="button" onclick="saveCrawlerSettings()" class="w-full py-2 bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-white font-semibold text-xs rounded-xl transition-all">
+            Save Crawler Settings to Persistent Storage
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Connection Test Feedback -->
+      <div id="modelTestFeedback" class="hidden p-3 rounded-xl text-xs font-mono"></div>
+
+      <!-- Modal Actions -->
+      <div class="flex items-center justify-between pt-2 border-t border-white/[0.06]">
+        <button type="button" onclick="testActiveModelConnection()" id="testConnectionBtn" class="px-3.5 py-2 bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-xs font-medium text-zinc-300 hover:text-white rounded-xl transition-all flex items-center space-x-1.5">
+          <i data-lucide="activity" class="w-3.5 h-3.5 text-blue-400"></i>
+          <span>Test Connection</span>
+        </button>
+
+        <div class="flex items-center space-x-2">
+          <button type="button" onclick="closeModelSettingsModal()" class="px-3.5 py-2 text-xs font-medium text-zinc-400 hover:text-white transition-all">
+            Cancel
+          </button>
+          <button type="button" onclick="saveAndActivateModel()" id="saveModelBtn" class="px-4 py-2 bg-white hover:bg-zinc-200 text-black font-semibold text-xs rounded-xl transition-all shadow-sm">
+            Save & Activate Engine
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Micro Toast Notification Element -->
+  <div id="toastNotification">
+    <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+    <span id="toastMessage">Action completed</span>
+  </div>
+
+  <footer class="border-t border-white/[0.06] py-5 text-center text-xs text-zinc-500 font-mono">
+    <span>AEOForge • MIT License • Meta Global AI Developer Hackathon 2026</span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

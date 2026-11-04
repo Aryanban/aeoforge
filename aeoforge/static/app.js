@@ -375,7 +375,14 @@ function renderAuditResults(result) {
   if (b64) {
     emptyImg.classList.add("hidden");
     shotImg.classList.remove("hidden");
-    shotImg.src = `data:image/png;base64,${b64}`;
+    shotImg.onerror = () => {
+      shotImg.classList.add("hidden");
+      emptyImg.classList.remove("hidden");
+    };
+    shotImg.src = b64.startsWith("data:") ? b64 : `data:image/jpeg;base64,${b64}`;
+  } else {
+    shotImg.classList.add("hidden");
+    emptyImg.classList.remove("hidden");
   }
 
   // Meta Llama 3.2 Advice with Formatted Sub-Telemetry
@@ -573,6 +580,9 @@ function renderRecommendations(recs, potentialScore) {
   const gradeBadge = document.getElementById("potentialGradeBadge");
   const listEl = document.getElementById("recommendationsList");
   const allCountEl = document.getElementById("recFilterAllCount");
+  const deltaPill = document.getElementById("potentialDeltaPill");
+  const barCurrent = document.getElementById("recProgressBarCurrent");
+  const barBoost = document.getElementById("recProgressBarBoost");
 
   if (!listEl) return;
 
@@ -582,6 +592,12 @@ function renderRecommendations(recs, potentialScore) {
 
   let pGrade = potentialScore >= 90 ? "Grade A+" : (potentialScore >= 80 ? "Grade A" : (potentialScore >= 70 ? "Grade B" : "Grade C"));
   if (gradeBadge) gradeBadge.textContent = pGrade;
+
+  const delta = Math.max(0, Math.round((potentialScore - baseScore) * 10) / 10);
+  if (deltaPill) deltaPill.textContent = `+${delta.toFixed(1)} pts boost`;
+
+  if (barCurrent) barCurrent.style.width = `${Math.min(100, baseScore)}%`;
+  if (barBoost) barBoost.style.width = `${Math.min(100 - baseScore, delta)}%`;
 
   listEl.innerHTML = "";
   if (!recs || recs.length === 0) {
@@ -607,10 +623,10 @@ function renderRecommendations(recs, potentialScore) {
     card.className = "p-3.5 bg-[#08080a] border border-white/[0.06] hover:border-white/10 rounded-xl space-y-2.5 transition-all";
 
     const impactBadge = r.impact === "critical"
-      ? `<span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold">Critical</span>`
+      ? `<span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 font-medium">Critical</span>`
       : (r.impact === "high"
-        ? `<span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">High Impact</span>`
-        : `<span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold">Quick Win</span>`);
+        ? `<span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">High</span>`
+        : `<span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">Quick win</span>`);
 
     card.innerHTML = `
       <div class="flex items-start justify-between gap-3">
@@ -620,8 +636,8 @@ function renderRecommendations(recs, potentialScore) {
             <div class="flex flex-wrap items-center gap-1.5">
               <span class="font-semibold text-white text-xs">${escapeHtml(r.title)}</span>
               ${impactBadge}
-              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">+${r.score_boost} pts</span>
-              ${r.target_file ? `<span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-300 border border-white/5">${escapeHtml(r.target_file)}</span>` : ''}
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">+${r.score_boost} pts</span>
+              ${r.target_file ? `<span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-850 text-zinc-300 border border-white/5">${escapeHtml(r.target_file)}</span>` : ''}
             </div>
             <p class="text-xs text-zinc-400 mt-1 leading-relaxed">${escapeHtml(r.description)}</p>
           </div>
@@ -669,6 +685,15 @@ function recalculateSimScore() {
   const gradeBadge = document.getElementById("potentialGradeBadge");
   let pGrade = total >= 90 ? "Grade A+" : (total >= 80 ? "Grade A" : (total >= 70 ? "Grade B" : (total >= 60 ? "Grade C" : "Grade F")));
   if (gradeBadge) gradeBadge.textContent = pGrade;
+
+  const delta = Math.max(0, Math.round((total - baseScore) * 10) / 10);
+  const deltaPill = document.getElementById("potentialDeltaPill");
+  if (deltaPill) deltaPill.textContent = `+${delta.toFixed(1)} pts boost`;
+
+  const barCurrent = document.getElementById("recProgressBarCurrent");
+  const barBoost = document.getElementById("recProgressBarBoost");
+  if (barCurrent) barCurrent.style.width = `${Math.min(100, baseScore)}%`;
+  if (barBoost) barBoost.style.width = `${Math.min(100 - baseScore, delta)}%`;
 }
 
 function copySnippet(idx) {

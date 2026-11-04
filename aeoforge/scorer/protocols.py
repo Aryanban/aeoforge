@@ -9,7 +9,6 @@ import httpx
 
 async def score_protocols(base_url: str) -> Dict[str, Any]:
     """Audit domain machine discovery protocols (llms.txt, robots.txt, sitemaps)."""
-    # shortcut: checks root /llms.txt and /robots.txt; upgrade to recursive sitemap index crawler for 10k+ page catalogs
     score = 0.0
     feedback = []
 
@@ -20,7 +19,6 @@ async def score_protocols(base_url: str) -> Dict[str, Any]:
     has_llms_full = False
     ai_crawlers_allowed = False
     has_sitemap = False
-    has_indexnow = False
 
     async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
         # 1. Check /llms.txt (0 - 10 pts)
@@ -52,26 +50,31 @@ async def score_protocols(base_url: str) -> Dict[str, Any]:
             resp = await client.get(f"{origin}/robots.txt")
             if resp.status_code == 200:
                 txt = resp.text.lower()
-                # Check for explicit AI crawler mentions
                 ai_bots = ["meta-externalagent", "gptbot", "claudebot", "perplexitybot", "google-extended"]
                 found_bots = [b for b in ai_bots if b in txt]
+                
                 # Check if disallowing all bots
-                if "user-agent: *" in txt and "disallow: /" in txt:
+                if "user-agent: *" in txt and ("disallow: /\n" in txt or "disallow: / " in txt or txt.endswith("disallow: /")):
+                    ai_crawlers_allowed = False
                     score += 1.0
                     feedback.append("robots.txt actively disallows all web crawlers.")
                 elif found_bots:
+                    ai_crawlers_allowed = True
                     score += 7.0
                     feedback.append(f"robots.txt contains explicit policies for AI agents: {', '.join(found_bots)}.")
                 else:
+                    ai_crawlers_allowed = False
                     score += 4.0
                     feedback.append("robots.txt present but lacks explicit policies for AI crawlers (Meta-ExternalAgent, PerplexityBot).")
             else:
+                ai_crawlers_allowed = False
                 score += 2.0
                 feedback.append("Missing robots.txt file.")
         except Exception:
+            ai_crawlers_allowed = False
             score += 2.0
 
-        # 4. Check /sitemap.xml and IndexNow (0 - 4 pts)
+        # 4. Check /sitemap.xml (0 - 4 pts)
         try:
             resp = await client.get(f"{origin}/sitemap.xml")
             if resp.status_code == 200 and ("<urlset" in resp.text or "<sitemapindex" in resp.text):
@@ -90,7 +93,8 @@ async def score_protocols(base_url: str) -> Dict[str, Any]:
         "details": {
             "has_llms_txt": has_llmstxt,
             "has_llms_full_txt": has_llms_full,
-            "has_sitemap_xml": has_sitemap
+            "has_sitemap_xml": has_sitemap,
+            "ai_bots_allowed": ai_crawlers_allowed
         },
         "feedback": feedback
     }

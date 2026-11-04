@@ -72,6 +72,11 @@ class MetaAIClient:
         traps: list
     ) -> Dict[str, Any]:
         """Perform multimodal visual audit using Meta Model API, Local Ollama, or heuristic fallback."""
+        if isinstance(a11y_tree, dict):
+            a11y_tree_str = json.dumps(a11y_tree)
+        else:
+            a11y_tree_str = str(a11y_tree or "")
+
         # Path 1: Cloud Meta Model API
         if self.api_key and screenshot_base64:
             try:
@@ -86,7 +91,7 @@ class MetaAIClient:
                         "content": [
                             {
                                 "type": "text",
-                                "text": f"Evaluate this webpage screenshot with Set-of-Mark tags.\nAccessibility Tree:\n{a11y_tree[:2000]}"
+                                "text": f"Evaluate this webpage screenshot with Set-of-Mark tags.\nAccessibility Tree:\n{a11y_tree_str[:2000]}"
                             },
                             {
                                 "type": "image_url",
@@ -120,7 +125,7 @@ class MetaAIClient:
                 try:
                     user_msg: Dict[str, Any] = {
                         "role": "user",
-                        "content": f"Evaluate this webpage screenshot and accessibility tree with Set-of-Mark tags:\nAccessibility Tree:\n{a11y_tree[:2500]}"
+                        "content": f"Evaluate this webpage screenshot and accessibility tree with Set-of-Mark tags:\nAccessibility Tree:\n{a11y_tree_str[:2500]}"
                     }
                     if has_vision and screenshot_base64:
                         user_msg["images"] = [screenshot_base64]
