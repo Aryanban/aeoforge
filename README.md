@@ -26,12 +26,20 @@ AEOForge audits web pages using local headless browser navigation, evaluates the
 
 ## Quickstart
 
-Clone the repository and launch the full stack with a single command. The setup script configures the Python virtual environment, installs dependencies, provisions Playwright Chromium, and verifies the local Ollama instance:
+Clone the repository and launch the full stack with a single command. The setup scripts configure the Python virtual environment, install dependencies, provision Playwright Chromium, and verify the local Meta AI / Ollama instance across macOS, Linux, and Windows:
 
 ```bash
 git clone https://github.com/Aryanban/aeoforge.git
 cd aeoforge
+
+# macOS & Linux (Bash)
 ./setup.sh --start
+
+# Windows (Command Prompt)
+setup.bat --start
+
+# Windows (PowerShell)
+.\setup.ps1
 ```
 
 The Web UI automatically opens at `http://localhost:8000`.
