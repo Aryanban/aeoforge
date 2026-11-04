@@ -92,6 +92,57 @@ AEOForge was benchmarked against traditional SEO platforms (Lighthouse, Screamin
 4. **Self-Healing AST Codebase Remediation in 0.28ms**:
    While traditional audit tools leave developers with static PDF reports, AEOForge includes a self-healing AST patcher that directly writes `llms.txt`, `agent-spec.json`, and injects Schema.org JSON-LD graphs into HTML, React, and Next.js templates in 0.28 milliseconds.
 
+### Automated Reinforcement Benchmark Run
+
+Any developer or autonomous agent can reproduce the benchmark scorecard locally:
+
+```bash
+.venv/bin/python scripts/benchmark_comprehensive.py
+```
+
+```text
+======================================================================
+AEOFORGE FULL-SPECTRUM QUANTIZED BENCHMARK SUITE
+======================================================================
+
+[1. Token Context Pruning & Distillation]
+Raw Enterprise HTML: 1583 tokens (6333 bytes)
+Agent-Spec (agent-spec.json): 565 tokens (64.31% reduction)
+LLMs Directory (llms.txt): 280 tokens (82.31% reduction)
+Spec Generation Latency: 8.837ms
+-> REWARD (+10): Token context pruned by >80% for llms.txt and >60% for full agent spec
+
+[2. Citability & Fact-Triplet Extraction]
+Pillar A Citability Score: 25.0 / 25.0
+Fact-Triplet Density: 93.3%
+Direct Answer Capsule Detected: True
+E-E-A-T Signal Score: 7.0 / 7.0
+Extraction Latency: 0.924ms
+-> REWARD (+10): Near-perfect Citability score (>=24/25) with answer capsule and empirical claims
+
+[3. Visual Coordinate Grounding (OmniParser v2 Standard)]
+Grounded Marks: 6
+Centroid Validation: 6/6 with exact (cx, cy) sub-pixel centroids
+Centroid Precision Rate: 100.0%
+-> REWARD (+10): Sub-pixel click centroid precision achieved 100.0% accuracy
+
+[4. Self-Healing Codebase AST Patcher]
+Patches Applied: 3 artifacts
+AST Execution Time: 0.273ms
+-> REWARD (+10): Instant atomic AST patch completed in < 50ms
+
+[5. Live Headless Navigation & Route Interception]
+Navigation + Parsing Duration: 0.858s
+DOM Elements: 619
+Grounded Interactive Marks: 20
+Traps Detected: 0
+-> REWARD (+10): Live navigation + AST parsing under 1.2s (sub-second performance achieved)
+
+======================================================================
+REINFORCEMENT EVALUATION: Rewards=+50 | Penalties=-0 | Net=+50 pts
+======================================================================
+```
+
 ---
 
 ## Usage Modes
