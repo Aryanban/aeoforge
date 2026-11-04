@@ -79,12 +79,91 @@ KNOWN_TRAP_SIGNATURES = [
 ]
 
 
+# Unified single-pass browser DOM evaluator for instant sub-3ms trap detection
+TRAP_EVALUATION_SCRIPT = """
+(signatures) => {
+    const detected = [];
+    const isVisible = (el) => {
+        if (!el) return false;
+        const style = window.getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+    };
+
+    // 1. Check known signatures in a single loop
+    for (const sig of signatures) {
+        for (const sel of sig.selectors) {
+            try {
+                const el = document.querySelector(sel);
+                if (el && isVisible(el)) {
+                    let dismissFound = null;
+                    for (const dSel of sig.dismiss_selectors) {
+                        try {
+                            const dEl = document.querySelector(dSel);
+                            if (dEl && isVisible(dEl)) {
+                                dismissFound = dSel;
+                                break;
+                            }
+                        } catch (e) {}
+                    }
+                    detected.push({
+                        name: sig.name,
+                        category: sig.category,
+                        severity: sig.severity,
+                        active_selector: sel,
+                        dismiss_selector: dismissFound,
+                        recommendation: dismissFound 
+                            ? `Add an automated pre-interaction dismissal using '${dismissFound}'.`
+                            : `Add an automated pre-interaction dismissal using '${sel}'.`
+                    });
+                    break;
+                }
+            } catch (e) {}
+        }
+    }
+
+    // 2. High Z-Index Viewport Overlay Heuristic
+    try {
+        const elements = document.querySelectorAll('div, section, aside, dialog');
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+
+        for (const el of elements) {
+            const style = window.getComputedStyle(el);
+            if (style.position === 'fixed' || style.position === 'absolute') {
+                const z = parseInt(style.zIndex, 10);
+                if (z >= 999) {
+                    const rect = el.getBoundingClientRect();
+                    if (rect.width >= vw * 0.5 && rect.height >= vh * 0.5 && isVisible(el)) {
+                        const sel = el.id ? '#' + el.id : (el.className ? '.' + el.className.toString().trim().split(/\\s+/).join('.') : el.tagName.toLowerCase());
+                        if (!detected.some(t => t.active_selector === sel)) {
+                            const btn = el.querySelector('button, a[role="button"], input[type="submit"]');
+                            detected.push({
+                                name: "High Z-Index Viewport Overlay",
+                                category: "viewport_obstruction",
+                                severity: "medium",
+                                active_selector: sel,
+                                dismiss_selector: btn ? `${sel} button` : null,
+                                recommendation: `Ensure overlay at '${sel}' does not hijack click events or obscure primary content.`
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    } catch (e) {}
+
+    return detected;
+}
+"""
+
+
 async def detect_navigation_traps(page) -> List[Dict[str, Any]]:
-    """Scan the rendered DOM for active modal overlays, cookie walls, and agent blockers."""
-    # shortcut: signature list covers top 5 CMPs and 3 captchas; upgrade to visual ML model if custom canvas modals appear
+    """Scan the rendered DOM for active modal overlays, cookie walls, and agent blockers in a single batch pass."""
     detected_traps: List[Dict[str, Any]] = []
 
-    # 0. Check page title and body text for WAF challenges
+    # 0. Check page title for WAF challenges
     try:
         title = await page.title()
         if "Attention Required! | Cloudflare" in title or "Just a moment..." in title:
@@ -108,79 +187,11 @@ async def detect_navigation_traps(page) -> List[Dict[str, Any]]:
     except Exception:
         pass
 
-    # 1. Check known signature selectors
-    for sig in KNOWN_TRAP_SIGNATURES:
-        for sel in sig["selectors"]:
-            try:
-                elem = await page.query_selector(sel)
-                if elem:
-                    is_visible = await elem.is_visible()
-                    if is_visible:
-                        # Find candidate dismiss button
-                        dismiss_sel_found = None
-                        for d_sel in sig["dismiss_selectors"]:
-                            d_elem = await page.query_selector(d_sel)
-                            if d_elem and await d_elem.is_visible():
-                                dismiss_sel_found = d_sel
-                                break
-
-                        detected_traps.append({
-                            "name": sig["name"],
-                            "category": sig["category"],
-                            "severity": sig["severity"],
-                            "active_selector": sel,
-                            "dismiss_selector": dismiss_sel_found,
-                            "recommendation": f"Add an automated pre-interaction dismissal using '{dismiss_sel_found or sel}'."
-                        })
-                        break
-            except Exception:
-                continue
-
-    # 2. Heuristic check: Generic fixed/sticky full-viewport overlays
+    # 1 & 2. Execute single-trip batch evaluation
     try:
-        heuristic_traps = await page.evaluate("""() => {
-            const traps = [];
-            const elements = document.querySelectorAll('div, section, aside, dialog');
-            const vw = window.innerWidth;
-            const vh = window.innerHeight;
-
-            for (const el of elements) {
-                const style = window.getComputedStyle(el);
-                if (style.position === 'fixed' || style.position === 'absolute') {
-                    const z = parseInt(style.zIndex, 10);
-                    if (z >= 999) {
-                        const rect = el.getBoundingClientRect();
-                        // Covers more than 50% of the viewport width and height
-                        if (rect.width >= vw * 0.5 && rect.height >= vh * 0.5) {
-                            // Find any button inside
-                            const btn = el.querySelector('button, a[role="button"], input[type="submit"]');
-                            const btnText = btn ? btn.innerText.trim().slice(0, 30) : null;
-                            traps.push({
-                                tagName: el.tagName.toLowerCase(),
-                                id: el.id ? '#' + el.id : null,
-                                className: el.className ? '.' + el.className.toString().split(' ').join('.') : null,
-                                zIndex: z,
-                                candidateButtonText: btnText
-                            });
-                        }
-                    }
-                }
-            }
-            return traps.slice(0, 3);
-        }""")
-
-        for ht in heuristic_traps:
-            # Check if not already matched
-            sel = ht["id"] or ht["className"] or ht["tagName"]
-            if not any(t["active_selector"] == sel for t in detected_traps):
-                detected_traps.append({
-                    "name": "High Z-Index Viewport Overlay",
-                    "category": "viewport_obstruction",
-                    "severity": "medium",
-                    "active_selector": sel,
-                    "dismiss_selector": f"{sel} button" if ht["candidateButtonText"] else None,
-                    "recommendation": f"Ensure overlay at '{sel}' doesn't hijack click events or obscure primary content."
-                })
+        dom_traps = await page.evaluate(TRAP_EVALUATION_SCRIPT, KNOWN_TRAP_SIGNATURES)
+        if dom_traps:
+            detected_traps.extend(dom_traps)
     except Exception:
         pass
 

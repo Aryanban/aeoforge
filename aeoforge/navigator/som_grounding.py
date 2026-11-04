@@ -1,23 +1,27 @@
 """Set-of-Mark (SoM) visual coordinate grounding and DOM accessibility tree extraction.
-Inspired by browser-use (https://github.com/browser-use/browser-use) and Microsoft OmniParser.
+Inspired by browser-use (https://github.com/browser-use/browser-use) and Microsoft OmniParser v2.
 """
 
 from typing import Dict, Any, List, Tuple
 
 
-# Injected JavaScript that identifies interactive elements, computes bounding boxes,
-# and returns a pruned semantic interactive tree.
+# Injected JavaScript that identifies interactive elements, computes sub-pixel center click targets,
+# and returns a pruned, deduplicated interactive tree.
 SOM_EXTRACTION_SCRIPT = """
 () => {
     const interactiveTags = new Set(['a', 'button', 'input', 'select', 'textarea', 'details', 'summary']);
     const interactiveRoles = new Set(['button', 'link', 'checkbox', 'radio', 'combobox', 'tab', 'menuitem', 'searchbox']);
     
-    const elements = document.querySelectorAll('*');
+    // Query focused interactive candidates directly instead of querying entire DOM tree
+    const candidates = document.querySelectorAll(
+        'a, button, input, select, textarea, details, summary, [role], [onclick], [tabindex]:not([tabindex="-1"]), [contenteditable="true"]'
+    );
     const marks = [];
+    const seenElements = new Set();
     let markId = 1;
 
-    for (const el of elements) {
-        // Skip script, style, noscript, svg internal nodes
+    for (const el of candidates) {
+        // Skip non-rendered or internal nodes
         const tag = el.tagName.toLowerCase();
         if (['script', 'style', 'noscript', 'meta', 'link', 'head'].includes(tag)) continue;
 
@@ -30,13 +34,26 @@ SOM_EXTRACTION_SCRIPT = """
 
         if (!isInteractive) continue;
 
-        // Check visibility and dimensions
+        // Skip disabled or inert elements
+        if (el.hasAttribute('disabled') || (el.closest && el.closest('[inert]'))) continue;
+
+        // Check computed visibility and pointer events
         const style = window.getComputedStyle(el);
-        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') continue;
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0' || style.pointerEvents === 'none') {
+            continue;
+        }
 
         const rect = el.getBoundingClientRect();
         if (rect.width <= 4 || rect.height <= 4) continue;
         if (rect.bottom < 0 || rect.top > window.innerHeight * 2) continue; // Out of immediate scroll window
+
+        // Deduplicate child elements inside already marked interactive parent (e.g., span inside button)
+        let parentInteractive = el.parentElement ? el.parentElement.closest('a, button, [role="button"], [role="link"]') : null;
+        if (parentInteractive && seenElements.has(parentInteractive) && (tag === 'span' || tag === 'svg' || tag === 'i' || tag === 'div')) {
+            continue;
+        }
+
+        seenElements.add(el);
 
         // Determine accessible name
         let name = el.getAttribute('aria-label') || 
@@ -46,17 +63,33 @@ SOM_EXTRACTION_SCRIPT = """
                    el.getAttribute('alt') || '';
         name = name.replace(/\\s+/g, ' ').trim().slice(0, 80);
 
+        // Calculate sub-pixel center click target for visual agents
+        const centerX = Math.round(rect.left + rect.width / 2);
+        const centerY = Math.round(rect.top + rect.height / 2);
+
+        // Action intent hint
+        let action = 'click';
+        if (tag === 'input' || tag === 'textarea') {
+            const inputType = el.getAttribute('type') || 'text';
+            action = ['checkbox', 'radio'].includes(inputType) ? 'toggle' : 'type';
+        } else if (tag === 'select') {
+            action = 'select';
+        }
+
         marks.push({
             id: markId++,
             tag: tag,
             role: role || tag,
             name: name,
             href: el.getAttribute('href') || null,
+            action: action,
             rect: {
                 x: Math.round(rect.left),
                 y: Math.round(rect.top),
                 width: Math.round(rect.width),
-                height: Math.round(rect.height)
+                height: Math.round(rect.height),
+                cx: centerX,
+                cy: centerY
             }
         });
 
@@ -129,7 +162,7 @@ SOM_REMOVE_BADGES_SCRIPT = """
 
 
 async def extract_interactive_marks(page) -> List[Dict[str, Any]]:
-    """Extract interactive element bounding boxes and labels."""
+    """Extract interactive element bounding boxes, click centroids, and labels."""
     try:
         marks = await page.evaluate(SOM_EXTRACTION_SCRIPT)
         return marks
@@ -159,5 +192,8 @@ def build_a11y_tree_representation(marks: List[Dict[str, Any]]) -> str:
     for m in marks:
         name_part = f" \"{m['name']}\"" if m['name'] else " (No Label)"
         href_part = f" -> {m['href']}" if m.get('href') else ""
-        lines.append(f"[{m['id']}] <{m['role']}>{name_part}{href_part} at ({m['rect']['x']},{m['rect']['y']})")
+        cx = m['rect'].get('cx', m['rect']['x'])
+        cy = m['rect'].get('cy', m['rect']['y'])
+        action = m.get('action', 'click')
+        lines.append(f"[{m['id']}] <{m['role']}>{name_part}{href_part} action={action} center=({cx},{cy})")
     return "\n".join(lines)

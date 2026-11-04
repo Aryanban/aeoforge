@@ -89,15 +89,19 @@ class BrowserNavigator:
 
             # Attach route interception to block bloat
             if settings.playwright_fast_route_filter:
-                await setup_route_interception(page, block_images=False)
+                await setup_route_interception(page, block_images=not capture_screenshot)
 
             http_status = 200
             try:
                 response = await page.goto(url, wait_until="domcontentloaded", timeout=self.timeout_ms)
                 if response:
                     http_status = response.status
-                # Wait briefly for client-side hydration
-                await page.wait_for_timeout(1000)
+                # Dynamic hydration check: wait until DOM has children with 200ms debounce
+                try:
+                    await page.wait_for_function("() => document.body && document.body.children.length > 0", timeout=1000)
+                except Exception:
+                    pass
+                await page.wait_for_timeout(200)
             except Exception as e:
                 pass
 
