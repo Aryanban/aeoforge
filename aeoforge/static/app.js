@@ -981,12 +981,9 @@ async function handleCrawlSubmit(event) {
       body: JSON.stringify({ url: url, max_pages: maxPages })
     });
 
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.detail || "Crawl failed");
-    }
-
     const data = await res.json();
+    renderCrawlReport(data);
+
     let rowsHtml = "";
     (data.pages || []).forEach(p => {
       const gradeColor = p.overall_score >= 80 ? "text-emerald-400" : (p.overall_score >= 60 ? "text-amber-400" : "text-rose-400");
@@ -2295,6 +2292,257 @@ function copyDrilldownSnippet() {
     showToast("Remediation code copied to clipboard");
   }
 }
+
+// --- Inline Sitewide BFS Crawl & Diagnostics Logic ---
+let currentCrawlData = null;
+
+function setInlineBudget(pages) {
+  const inlineInput = document.getElementById("inlineCrawlBudgetInput");
+  const drawerInput = document.getElementById("crawlMaxPagesInput");
+  if (inlineInput) inlineInput.value = pages;
+  if (drawerInput) drawerInput.value = pages;
+  showToast(`Crawl budget set to ${pages} pages`);
+}
+
+function closeCrawlResults() {
+  const card = document.getElementById("crawlResultsCard");
+  if (card) card.classList.add("hidden");
+}
+
+async function handleInlineCrawlSubmit() {
+  const urlInput = document.getElementById("targetUrlInput");
+  const budgetInput = document.getElementById("inlineCrawlBudgetInput");
+  const btn = document.getElementById("inlineCrawlSubmitBtn");
+  if (!urlInput) return;
+
+  let url = urlInput.value.trim();
+  if (!url) {
+    showToast("Please enter a target domain to crawl");
+    return;
+  }
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    url = "https://" + url;
+  }
+
+  const budget = parseInt(budgetInput ? budgetInput.value : "10", 10) || 10;
+  const originalBtnHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Crawling (${budget}p)...</span>`;
+  if (window.lucide) lucide.createIcons();
+
+  try {
+    const res = await fetch("/api/v1/crawl", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: url, max_pages: budget })
+    });
+
+    const data = await res.json();
+    renderCrawlReport(data);
+    if (data.crawl_status === "completed") {
+      showToast(`Sitewide crawl complete: ${data.pages_crawled} pages audited`);
+    } else if (data.crawl_status === "partial") {
+      showToast(`Partial crawl: ${data.pages_crawled} of ${data.budget_requested} pages audited`);
+    } else {
+      showToast(`Crawl failed: ${data.termination_reason}`);
+    }
+  } catch (e) {
+    showToast(`Crawl request obstacle: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalBtnHtml;
+    if (window.lucide) lucide.createIcons();
+  }
+}
+
+function renderCrawlReport(data) {
+  currentCrawlData = data;
+  const card = document.getElementById("crawlResultsCard");
+  const summaryStats = document.getElementById("crawlSummaryStats");
+  const sitewideScore = document.getElementById("crawlSitewideScore");
+  const sitewideGrade = document.getElementById("crawlSitewideGradeBadge");
+  const statusBanner = document.getElementById("crawlStatusBanner");
+  const statusHeading = document.getElementById("crawlStatusHeading");
+  const budgetProgress = document.getElementById("crawlBudgetProgressBadge");
+  const failureReasonBox = document.getElementById("crawlFailureReasonBox");
+  const remediationBox = document.getElementById("crawlRemediationBox");
+  const insightsStrip = document.getElementById("crawlInsightsStrip");
+  const pagesTableTbody = document.getElementById("crawlResultsTbody");
+  const failedSection = document.getElementById("crawlFailedSection");
+  const failedTableTbody = document.getElementById("crawlFailedTbody");
+
+  if (card) card.classList.remove("hidden");
+  if (summaryStats) {
+    summaryStats.textContent = `Audited ${data.pages_crawled || 0} of ${data.budget_requested || 0} requested pages (${data.completion_pct || 0}% budget fulfillment)`;
+  }
+  if (sitewideScore) {
+    sitewideScore.textContent = (data.sitewide_score || 0).toFixed(1);
+  }
+  if (sitewideGrade) {
+    sitewideGrade.textContent = `Grade ${data.sitewide_grade || 'F'}`;
+    if (data.sitewide_score >= 80) {
+      sitewideGrade.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20";
+    } else if (data.sitewide_score >= 60) {
+      sitewideGrade.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20";
+    } else {
+      sitewideGrade.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 font-bold border border-rose-500/20";
+    }
+  }
+
+  if (budgetProgress) {
+    budgetProgress.textContent = `${data.pages_crawled || 0} / ${data.budget_requested || 0} pages (${data.completion_pct || 0}%)`;
+  }
+
+  // Outcome Banner Configuration
+  if (statusBanner) {
+    if (data.crawl_status === "completed") {
+      statusBanner.className = "p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 space-y-2 font-mono text-xs";
+      if (statusHeading) {
+        statusHeading.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i><span class="text-emerald-400 font-bold">Crawl Complete — Full Budget Fulfilled</span>`;
+      }
+      if (failureReasonBox) {
+        failureReasonBox.innerHTML = `<strong>Completion Status:</strong> ${escapeHtml(data.termination_reason || '')}`;
+      }
+      if (remediationBox) {
+        remediationBox.innerHTML = `<span class="text-emerald-300">All ${data.pages_crawled} pages successfully retrieved, verified for Set-of-Marks, and scored across all 4 AEO foundation pillars.</span>`;
+      }
+    } else if (data.crawl_status === "partial") {
+      statusBanner.className = "p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 space-y-2 font-mono text-xs";
+      if (statusHeading) {
+        statusHeading.innerHTML = `<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i><span class="text-amber-400 font-bold">Partial Crawl Completed (${data.pages_crawled} of ${data.budget_requested} pages)</span>`;
+      }
+      if (failureReasonBox) {
+        failureReasonBox.innerHTML = `<strong>Where & Why Crawl Stopped:</strong> ${escapeHtml(data.termination_reason || '')}`;
+      }
+      if (remediationBox) {
+        const lastFail = (data.failed_pages && data.failed_pages.length > 0) ? data.failed_pages[data.failed_pages.length - 1] : null;
+        remediationBox.innerHTML = `<span class="text-amber-300"><strong>Remediation:</strong> ${escapeHtml(lastFail ? lastFail.recommendation : 'Review failed routes below.')}</span>`;
+      }
+    } else {
+      statusBanner.className = "p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 space-y-2 font-mono text-xs";
+      if (statusHeading) {
+        statusHeading.innerHTML = `<i data-lucide="alert-octagon" class="w-4 h-4 text-rose-400"></i><span class="text-rose-400 font-bold">Domain Crawl Blocked / Inaccessible</span>`;
+      }
+      if (failureReasonBox) {
+        failureReasonBox.innerHTML = `<strong>Root Cause Obstacle:</strong> ${escapeHtml(data.termination_reason || '')}`;
+      }
+      if (remediationBox) {
+        const firstFail = (data.failed_pages && data.failed_pages.length > 0) ? data.failed_pages[0] : null;
+        remediationBox.innerHTML = `<span class="text-rose-300"><strong>Engineering Action Required:</strong> ${escapeHtml(firstFail ? firstFail.recommendation : 'Check domain DNS, Cloudflare Bot Fight Mode, or firewall settings.')}</span>`;
+      }
+    }
+  }
+
+  // Cumulative Insights Strip
+  if (insightsStrip) {
+    if (data.pages_crawled > 0 && data.insights) {
+      insightsStrip.classList.remove("hidden");
+      const cit = document.getElementById("crawlAvgCitability");
+      const nav = document.getElementById("crawlAvgNavigability");
+      const pro = document.getElementById("crawlAvgProtocols");
+      const str = document.getElementById("crawlAvgStructured");
+      if (cit) cit.textContent = `${(data.insights.avg_citability || 0).toFixed(1)} / 25`;
+      if (nav) nav.textContent = `${(data.insights.avg_navigability || 0).toFixed(1)} / 25`;
+      if (pro) pro.textContent = `${(data.insights.avg_protocols || 0).toFixed(1)} / 25`;
+      if (str) str.textContent = `${(data.insights.avg_structured_data || 0).toFixed(1)} / 25`;
+    } else {
+      insightsStrip.classList.add("hidden");
+    }
+  }
+
+  // Populate Crawled Pages Table
+  if (pagesTableTbody) {
+    pagesTableTbody.innerHTML = "";
+    if (!data.pages || data.pages.length === 0) {
+      pagesTableTbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-zinc-500 font-mono">No pages successfully audited due to entry blockade.</td></tr>`;
+    } else {
+      data.pages.forEach((p, idx) => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-white/[0.02] transition-colors";
+        const scoreColor = p.overall_score >= 80 ? "text-emerald-400" : (p.overall_score >= 60 ? "text-amber-400" : "text-rose-400");
+        const gradeBadgeClass = p.overall_score >= 80 
+          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+          : (p.overall_score >= 60 ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20");
+
+        tr.innerHTML = `
+          <td class="p-3">
+            <div class="font-medium text-white truncate max-w-[220px]" title="${escapeHtml(p.url)}">${escapeHtml(p.url)}</div>
+            <div class="text-[10px] text-zinc-500 truncate max-w-[220px]">${escapeHtml(p.title || "")}</div>
+          </td>
+          <td class="p-3">
+            <div class="flex items-center space-x-1.5">
+              <span class="font-bold ${scoreColor}">${(p.overall_score || 0).toFixed(1)}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded font-mono ${gradeBadgeClass}">${p.grade}</span>
+            </div>
+          </td>
+          <td class="p-3 text-zinc-300">${(p.citability || 0).toFixed(1)}</td>
+          <td class="p-3 text-zinc-300">${(p.navigability || 0).toFixed(1)}</td>
+          <td class="p-3 text-zinc-300">${(p.protocols || 0).toFixed(1)}</td>
+          <td class="p-3 text-zinc-300">${(p.structured_data || 0).toFixed(1)}</td>
+          <td class="p-3 text-zinc-400 text-[11px] truncate max-w-[240px]" title="${escapeHtml(p.top_deduction || '')}">
+            <span class="text-rose-400 font-mono">${escapeHtml(p.top_deduction || 'None')}</span>
+          </td>
+          <td class="p-3 text-right">
+            <button type="button" onclick="loadCrawlResultIntoStudio(${idx})" class="px-2.5 py-1 rounded bg-white/[0.04] hover:bg-white/[0.1] border border-white/10 text-white font-mono text-[11px] transition-all inline-flex items-center space-x-1 hover:border-white/30">
+              <span>Inspect</span>
+              <i data-lucide="arrow-right" class="w-3 h-3"></i>
+            </button>
+          </td>
+        `;
+        pagesTableTbody.appendChild(tr);
+      });
+    }
+  }
+
+  // Populate Failed Pages Table (if any)
+  if (failedSection && failedTableTbody) {
+    if (data.failed_pages && data.failed_pages.length > 0) {
+      failedSection.classList.remove("hidden");
+      failedTableTbody.innerHTML = "";
+      data.failed_pages.forEach(f => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="p-3">
+            <span class="text-zinc-500 text-[10px] block">Step #${f.step}</span>
+            <span class="font-medium text-white truncate max-w-[200px] block" title="${escapeHtml(f.url)}">${escapeHtml(f.url)}</span>
+          </td>
+          <td class="p-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">${escapeHtml(f.category || 'ERROR')}</span>
+          </td>
+          <td class="p-3 text-zinc-300 leading-relaxed max-w-[260px]">${escapeHtml(f.reason || '')}</td>
+          <td class="p-3 text-emerald-400 leading-relaxed max-w-[260px]">${escapeHtml(f.recommendation || '')}</td>
+        `;
+        failedTableTbody.appendChild(tr);
+      });
+    } else {
+      failedSection.classList.add("hidden");
+    }
+  }
+
+  if (card) {
+    card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+function loadCrawlResultIntoStudio(index) {
+  if (!currentCrawlData || !currentCrawlData.pages || !currentCrawlData.pages[index]) return;
+  const page = currentCrawlData.pages[index];
+  if (page.full_audit) {
+    currentAuditResult = page.full_audit;
+    currentSpecResult = page.full_audit;
+    renderAuditResults(page.full_audit);
+    showToast(`Loaded ${page.url} into studio`);
+    const display = document.getElementById("scoreDisplay");
+    if (display) display.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}
+
+window.setInlineBudget = setInlineBudget;
+window.handleInlineCrawlSubmit = handleInlineCrawlSubmit;
+window.closeCrawlResults = closeCrawlResults;
+window.loadCrawlResultIntoStudio = loadCrawlResultIntoStudio;
+window.renderCrawlReport = renderCrawlReport;
 
 window.setAuditMode = setAuditMode;
 window.closeBatchResults = closeBatchResults;

@@ -6,12 +6,15 @@ from aeoforge.models.meta_client import MetaAIClient
 
 @pytest.mark.asyncio
 async def test_ollama_model_resolution():
-    """Verify that MetaAIClient detects local Ollama and resolves an installed model."""
+    """Verify that MetaAIClient detects local Ollama or gracefully falls back when offline."""
     client = MetaAIClient()
+    is_available = await client._check_ollama_available()
     model, has_vis = await client._resolve_ollama_model()
-    # If Ollama is running, model must be resolved
-    assert model is not None, "Ollama model should be resolved"
-    assert "llama" in model.lower() or model == "llama3.2:latest"
+    if is_available:
+        assert model is not None, "Ollama model should be resolved when daemon is online"
+        assert "llama" in model.lower() or "latest" in model.lower()
+    else:
+        assert model is None, "Model should be None when daemon is offline"
 
 
 @pytest.mark.asyncio

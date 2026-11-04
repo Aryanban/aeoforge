@@ -187,6 +187,46 @@
             <span class="text-zinc-500 font-mono hidden sm:inline">Press ↵ to audit</span>
           </div>
         </div>
+
+        <!-- Direct Sitewide BFS Crawl Budget & Execution Strip -->
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-3 mt-1 border-t border-white/[0.06]">
+          <div class="flex flex-wrap items-center gap-2.5 text-xs">
+            <div class="flex items-center space-x-2 bg-[#08080a] border border-white/[0.12] focus-within:border-blue-400/50 rounded-xl px-3 py-1.5 transition-all shadow-sm">
+              <i data-lucide="network" class="w-3.5 h-3.5 text-blue-400"></i>
+              <span class="text-zinc-300 font-medium whitespace-nowrap">BFS Crawl Budget:</span>
+              <input 
+                type="number" 
+                id="inlineCrawlBudgetInput" 
+                min="1" 
+                max="1000" 
+                value="10" 
+                class="w-16 px-2 py-0.5 bg-zinc-900 border border-white/10 rounded-md text-white font-mono text-xs text-center outline-none focus:border-blue-400"
+                title="Set maximum pages to traverse (1 to 1,000)"
+              >
+              <span class="text-zinc-500 font-mono text-[11px]">pages</span>
+            </div>
+
+            <!-- Quick Budget Presets -->
+            <div class="flex items-center space-x-1 font-mono text-[11px]">
+              <span class="text-zinc-500 text-[10px] uppercase ml-1 mr-0.5 hidden sm:inline">Quick Budget:</span>
+              <button type="button" onclick="setInlineBudget(5)" class="px-2 py-1 rounded bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/[0.06] transition-all">5p</button>
+              <button type="button" onclick="setInlineBudget(15)" class="px-2 py-1 rounded bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/[0.06] transition-all">15p</button>
+              <button type="button" onclick="setInlineBudget(50)" class="px-2 py-1 rounded bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/[0.06] transition-all">50p</button>
+              <button type="button" onclick="setInlineBudget(100)" class="px-2 py-1 rounded bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/[0.06] transition-all">100p</button>
+              <button type="button" onclick="setInlineBudget(1000)" class="px-2 py-1 rounded bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/[0.06] transition-all">1000p</button>
+            </div>
+          </div>
+
+          <button 
+            type="button" 
+            onclick="handleInlineCrawlSubmit()" 
+            id="inlineCrawlSubmitBtn"
+            class="px-5 py-2 bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white font-semibold text-xs rounded-xl transition-all flex items-center space-x-2 shadow-sm whitespace-nowrap"
+          >
+            <i data-lucide="network" class="w-3.5 h-3.5 text-white"></i>
+            <span>Crawl Entire Domain (BFS)</span>
+          </button>
+        </div>
       </form>
 
       <!-- Form 2: Custom URL List Batch Audit Dock -->
@@ -268,6 +308,120 @@ https://linear.app</textarea>
           </tbody>
         </table>
       </div>
+    </div>
+
+    <!-- Sitewide BFS Crawl Diagnostics & Insights Card -->
+    <div id="crawlResultsCard" class="hidden bg-zinc-925 border border-white/[0.08] rounded-2xl p-5 space-y-4 shadow-xl">
+      <!-- Card Header -->
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.06]">
+        <div>
+          <h3 class="text-sm font-semibold text-white tracking-tight flex items-center space-x-2">
+            <i data-lucide="network" class="w-4 h-4 text-blue-400"></i>
+            <span>Sitewide Multi-Page BFS Crawl Report</span>
+          </h3>
+          <p class="text-xs text-zinc-400 font-mono mt-0.5" id="crawlSummaryStats">Audited 0 pages</p>
+        </div>
+        <div class="flex items-center space-x-3">
+          <div class="text-right">
+            <span class="text-[10px] font-mono text-zinc-500 uppercase">Sitewide Aggregate Score</span>
+            <div class="flex items-baseline space-x-1.5">
+              <span id="crawlSitewideScore" class="text-xl font-bold font-mono text-white">--</span>
+              <span class="text-xs font-mono text-zinc-500">/ 100</span>
+              <span id="crawlSitewideGradeBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-bold border border-white/10">Grade --</span>
+            </div>
+          </div>
+          <button type="button" onclick="closeCrawlResults()" class="text-zinc-400 hover:text-white p-1">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Comprehensive Outcome & Failure Diagnostics Banner -->
+      <div id="crawlStatusBanner" class="p-4 rounded-xl border space-y-2 font-mono text-xs">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-2" id="crawlStatusHeading">
+            <!-- Populated dynamically with icon & status -->
+          </div>
+          <span id="crawlBudgetProgressBadge" class="text-[11px] px-2 py-0.5 rounded bg-black/40 border border-white/10 font-bold">0 / 0 pages (0%)</span>
+        </div>
+        <div id="crawlFailureReasonBox" class="text-zinc-300 text-[11px] leading-relaxed pt-1 border-t border-white/10">
+          <!-- Populated dynamically with failure reason & location -->
+        </div>
+        <div id="crawlRemediationBox" class="text-emerald-400 text-[11px] pt-1">
+          <!-- Populated dynamically with remediation advice -->
+        </div>
+      </div>
+
+      <!-- Cumulative 4-Pillar Insights Strip (Visible when pages were successfully crawled) -->
+      <div id="crawlInsightsStrip" class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+        <div class="p-3 bg-[#08080a] border border-white/[0.06] rounded-xl space-y-0.5">
+          <span class="text-zinc-500 text-[10px] block">Avg Citability</span>
+          <strong id="crawlAvgCitability" class="text-blue-400 font-mono text-sm">-- / 25</strong>
+        </div>
+        <div class="p-3 bg-[#08080a] border border-white/[0.06] rounded-xl space-y-0.5">
+          <span class="text-zinc-500 text-[10px] block">Avg Navigability</span>
+          <strong id="crawlAvgNavigability" class="text-emerald-400 font-mono text-sm">-- / 25</strong>
+        </div>
+        <div class="p-3 bg-[#08080a] border border-white/[0.06] rounded-xl space-y-0.5">
+          <span class="text-zinc-500 text-[10px] block">Avg Protocols</span>
+          <strong id="crawlAvgProtocols" class="text-amber-400 font-mono text-sm">-- / 25</strong>
+        </div>
+        <div class="p-3 bg-[#08080a] border border-white/[0.06] rounded-xl space-y-0.5">
+          <span class="text-zinc-500 text-[10px] block">Avg Structured</span>
+          <strong id="crawlAvgStructured" class="text-purple-400 font-mono text-sm">-- / 25</strong>
+        </div>
+      </div>
+
+      <!-- Table 1: Crawled & Audited Pages -->
+      <div id="crawlPagesSection" class="space-y-2">
+        <h4 class="text-xs font-semibold text-zinc-300 uppercase tracking-wider font-mono flex items-center space-x-1.5">
+          <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Successfully Audited Internal Pages</span>
+        </h4>
+        <div class="overflow-x-auto border border-white/[0.06] rounded-xl">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="bg-[#08080a] border-b border-white/[0.06] text-zinc-400 font-mono text-[11px]">
+                <th class="p-3">Crawled Route</th>
+                <th class="p-3">Score</th>
+                <th class="p-3">Citability</th>
+                <th class="p-3">Navigability</th>
+                <th class="p-3">Protocols</th>
+                <th class="p-3">Structured</th>
+                <th class="p-3">Top Deduction / Score Loss</th>
+                <th class="p-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="crawlResultsTbody" class="divide-y divide-white/[0.05] font-mono">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Table 2: Failed or Blocked Routes (if any) -->
+      <div id="crawlFailedSection" class="hidden space-y-2 pt-2 border-t border-white/[0.06]">
+        <h4 class="text-xs font-semibold text-rose-400 uppercase tracking-wider font-mono flex items-center space-x-1.5">
+          <i data-lucide="alert-octagon" class="w-3.5 h-3.5 text-rose-400"></i>
+          <span>Failed or Inaccessible Routes Encountered</span>
+        </h4>
+        <div class="overflow-x-auto border border-rose-500/20 rounded-xl bg-rose-500/[0.02]">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="bg-[#08080a] border-b border-rose-500/20 text-rose-300 font-mono text-[11px]">
+                <th class="p-3">Step # & Failed URL</th>
+                <th class="p-3">Obstacle Category</th>
+                <th class="p-3">Exact Technical Failure Reason</th>
+                <th class="p-3">Actionable Remediation / Bypass</th>
+              </tr>
+            </thead>
+            <tbody id="crawlFailedTbody" class="divide-y divide-rose-500/10 font-mono text-[11px]">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
 
     <!-- Interactive Step-by-Step Reactive Loading State -->

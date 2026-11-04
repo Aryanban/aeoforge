@@ -74,6 +74,8 @@ class NavigatedPageData(BaseModel):
     interactive_marks: list
     a11y_tree: str
     emails: list
+    http_status: int = 200
+    navigation_error: Optional[str] = None
 
 
 class BrowserNavigator:
@@ -117,6 +119,7 @@ class BrowserNavigator:
                 await setup_route_interception(page, block_images=not capture_screenshot)
 
             http_status = 200
+            navigation_error = None
             try:
                 response = await page.goto(url, wait_until="domcontentloaded", timeout=self.timeout_ms)
                 if response:
@@ -136,7 +139,7 @@ class BrowserNavigator:
                     pass
                 await page.wait_for_timeout(300)
             except Exception as e:
-                pass
+                navigation_error = str(e)
 
             final_url = page.url
             title = await page.title()
@@ -199,5 +202,7 @@ class BrowserNavigator:
                 traps=traps,
                 interactive_marks=marks,
                 a11y_tree=a11y_tree,
-                emails=emails
+                emails=emails,
+                http_status=http_status,
+                navigation_error=navigation_error
             )
